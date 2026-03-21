@@ -1,20 +1,23 @@
 import type { Preview, Decorator } from "@storybook/react";
-import React, { useEffect } from "react";
+import React from "react";
 import { useDarkMode } from "storybook-dark-mode";
+import { ThemeProvider } from "../src/components/ui/theme-provider";
 import "../src/styles/globals.css";
 
-const withDarkMode: Decorator = (Story) => {
+const withThemeProvider: Decorator = (Story) => {
   return React.createElement(() => {
     const isDark = useDarkMode();
-    useEffect(() => {
-      document.documentElement.classList.toggle("dark", isDark);
-    }, [isDark]);
-    return React.createElement(Story);
+    const theme = isDark ? "dark" : "light";
+    return React.createElement(
+      ThemeProvider,
+      { defaultTheme: theme, key: theme },
+      React.createElement(Story)
+    );
   });
 };
 
 const preview: Preview = {
-  decorators: [withDarkMode],
+  decorators: [withThemeProvider],
   parameters: {
     controls: {
       matchers: {
