@@ -1,20 +1,7 @@
-import type { Preview, Decorator } from "@storybook/react";
-import React from "react";
+import type { Preview } from "@storybook/react";
 import "../src/styles/globals.css";
 
-const withDarkMode: Decorator = (Story, context) => {
-  const isDark = context.globals?.darkMode === "dark";
-  document.documentElement.classList.toggle("dark", isDark);
-  return React.createElement(Story);
-};
-
 const preview: Preview = {
-  globalTypes: {
-    darkMode: {
-      defaultValue: "light",
-    },
-  },
-  decorators: [withDarkMode],
   parameters: {
     controls: {
       matchers: {
@@ -23,6 +10,10 @@ const preview: Preview = {
       },
     },
     darkMode: {
+      stylePreview: true,
+      darkClass: "dark",
+      lightClass: "light",
+      classTarget: "html",
       dark: { appBg: "hsl(222.2 84% 4.9%)", appContentBg: "hsl(222.2 84% 4.9%)" },
       light: { appBg: "hsl(0 0% 100%)", appContentBg: "hsl(0 0% 100%)" },
       current: "light",
