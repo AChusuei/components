@@ -5,15 +5,13 @@ import { ThemeProvider } from "../src/components/ui/theme-provider";
 import "../src/styles/globals.css";
 
 const withThemeProvider: Decorator = (Story) => {
-  return React.createElement(() => {
-    const isDark = useDarkMode();
-    const theme = isDark ? "dark" : "light";
-    return React.createElement(
-      ThemeProvider,
-      { defaultTheme: theme, key: theme },
-      React.createElement(Story)
-    );
-  });
+  const isDark = useDarkMode();
+  const theme = isDark ? "dark" : "light";
+  return React.createElement(
+    ThemeProvider,
+    { defaultTheme: theme, key: theme },
+    React.createElement(Story)
+  );
 };
 
 const preview: Preview = {
