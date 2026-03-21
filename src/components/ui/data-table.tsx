@@ -99,6 +99,7 @@ export type CellFormatter =
  * Format a raw cell value with a built-in formatter.
  * Can also be used standalone outside of DataTable.
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function formatCellValue(
   value: unknown,
   formatter: CellFormatter

@@ -247,7 +247,8 @@ export const Empty: Story = {
   },
 };
 
-export const Error: Story = {
+export const ErrorState: Story = {
+  name: "Error",
   args: {
     columns: COLUMNS,
     data: [],
@@ -593,8 +594,8 @@ function makeServerFetch(allData: Person[]) {
     if (params.sorting.length > 0) {
       const { id, desc } = params.sorting[0];
       filtered.sort((a, b) => {
-        const av = (a as Record<string, unknown>)[id];
-        const bv = (b as Record<string, unknown>)[id];
+        const av = (a as unknown as Record<string, unknown>)[id];
+        const bv = (b as unknown as Record<string, unknown>)[id];
         const cmp =
           typeof av === "string"
             ? av.localeCompare(bv as string)
@@ -659,24 +660,27 @@ const SERVER_COLUMNS: DataTableColumnDef<Person>[] = [
   },
 ];
 
+// Stable references — created once so stories don't recreate on every render
+const serverFetch = makeServerFetch(PEOPLE);
+const errorFetch = async (): Promise<ServerFetchResult<Person>> => {
+  await new Promise((r) => setTimeout(r, 300));
+  throw new Error("Network error: failed to fetch data.");
+};
+
 export const ServerSide: Story = {
   name: "Server-side Mode",
-  render: () => {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const fetchData = React.useCallback(makeServerFetch(PEOPLE), []);
-    return (
-      <DataTable
-        columns={SERVER_COLUMNS}
-        fetchData={fetchData}
-        enableSorting
-        enableColumnFilters
-        enableGlobalFilter
-        enablePagination
-        defaultPageSize={5}
-        pageSizeOptions={[5, 10]}
-      />
-    );
-  },
+  render: () => (
+    <DataTable
+      columns={SERVER_COLUMNS}
+      fetchData={serverFetch}
+      enableSorting
+      enableColumnFilters
+      enableGlobalFilter
+      enablePagination
+      defaultPageSize={5}
+      pageSizeOptions={[5, 10]}
+    />
+  ),
 };
 
 export const ServerSideDark: Story = {
@@ -689,46 +693,32 @@ export const ServerSideDark: Story = {
       </div>
     ),
   ],
-  render: () => {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const fetchData = React.useCallback(makeServerFetch(PEOPLE), []);
-    return (
-      <div className="dark">
-        <DataTable
-          columns={SERVER_COLUMNS}
-          fetchData={fetchData}
-          enableSorting
-          enableColumnFilters
-          enableGlobalFilter
-          enablePagination
-          defaultPageSize={5}
-          pageSizeOptions={[5, 10]}
-        />
-      </div>
-    );
-  },
+  render: () => (
+    <div className="dark">
+      <DataTable
+        columns={SERVER_COLUMNS}
+        fetchData={serverFetch}
+        enableSorting
+        enableColumnFilters
+        enableGlobalFilter
+        enablePagination
+        defaultPageSize={5}
+        pageSizeOptions={[5, 10]}
+      />
+    </div>
+  ),
 };
 
 export const ServerSideError: Story = {
   name: "Server-side Error State",
-  render: () => {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const fetchData = React.useCallback(
-      async (_params: ServerFetchParams): Promise<ServerFetchResult<Person>> => {
-        await new Promise((r) => setTimeout(r, 300));
-        throw new Error("Network error: failed to fetch data.");
-      },
-      []
-    );
-    return (
-      <DataTable
-        columns={SERVER_COLUMNS}
-        fetchData={fetchData}
-        enablePagination
-        defaultPageSize={5}
-      />
-    );
-  },
+  render: () => (
+    <DataTable
+      columns={SERVER_COLUMNS}
+      fetchData={errorFetch}
+      enablePagination
+      defaultPageSize={5}
+    />
+  ),
 };
 
 // ─── Phase 2: Full Phase 2 ────────────────────────────────────────────────────
