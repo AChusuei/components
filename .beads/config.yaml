@@ -52,7 +52,3 @@
 # - linear.api-key
 # - github.org
 # - github.repo
-
-sync.mode: dolt-native
-prefix: co
-issue-prefix: co
