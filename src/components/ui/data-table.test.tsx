@@ -1,4 +1,3 @@
-import * as React from "react";
 import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
@@ -599,7 +598,7 @@ describe("DataTable", () => {
 
   it("passes sorting params to fetchData", async () => {
     const fetchData = vi.fn(
-      async (): Promise<ServerFetchResult<Person>> => ({
+      async (_params: ServerFetchParams): Promise<ServerFetchResult<Person>> => ({
         data: PEOPLE,
         total: PEOPLE.length,
       })
@@ -627,7 +626,7 @@ describe("DataTable", () => {
 
   it("passes globalFilter to fetchData", async () => {
     const fetchData = vi.fn(
-      async (): Promise<ServerFetchResult<Person>> => ({
+      async (_params: ServerFetchParams): Promise<ServerFetchResult<Person>> => ({
         data: PEOPLE,
         total: PEOPLE.length,
       })

@@ -247,7 +247,7 @@ export const Empty: Story = {
   },
 };
 
-export const Error: Story = {
+export const ErrorState: Story = {
   args: {
     columns: COLUMNS,
     data: [],
@@ -593,8 +593,8 @@ function makeServerFetch(allData: Person[]) {
     if (params.sorting.length > 0) {
       const { id, desc } = params.sorting[0];
       filtered.sort((a, b) => {
-        const av = (a as Record<string, unknown>)[id];
-        const bv = (b as Record<string, unknown>)[id];
+        const av = (a as unknown as Record<string, unknown>)[id];
+        const bv = (b as unknown as Record<string, unknown>)[id];
         const cmp =
           typeof av === "string"
             ? av.localeCompare(bv as string)
