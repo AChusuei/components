@@ -1,7 +1,18 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
-import { DataTable, type DataTableColumnDef } from "./data-table";
+import {
+  DataTable,
+  type DataTableColumnDef,
+  type DataTableFetchParams,
+  type DataTableFetchResult,
+  formatDate,
+  formatDateTime,
+  formatCurrency,
+  formatNumber,
+  formatBoolean,
+  createBadgeCell,
+} from "./data-table";
 
 // ─── Sample Data ──────────────────────────────────────────────────────────────
 
@@ -319,6 +330,8 @@ describe("DataTable", () => {
 
   // ── Number range filters actual filtering ────────────────────────────────
 
+  // ── Number range filters actual filtering ────────────────────────────────
+
   it("filters rows by number range", async () => {
     const user = userEvent.setup();
     const cols: DataTableColumnDef<Person>[] = [
@@ -332,5 +345,231 @@ describe("DataTable", () => {
     expect(screen.getByText("Alice")).toBeInTheDocument();
     expect(screen.queryByText("Bob")).not.toBeInTheDocument();
     expect(screen.queryByText("Carol")).not.toBeInTheDocument();
+  });
+
+  // ── Phase 2: Cell Formatters ──────────────────────────────────────────────
+
+  describe("Cell Formatters", () => {
+    it("formatDate returns formatted date string", () => {
+      expect(formatDate("2024-01-15")).toContain("2024");
+      expect(formatDate("2024-01-15")).toContain("Jan");
+    });
+
+    it("formatDate returns em-dash for null/empty", () => {
+      expect(formatDate(null)).toBe("—");
+      expect(formatDate("")).toBe("—");
+    });
+
+    it("formatDateTime returns date and time", () => {
+      const result = formatDateTime("2024-03-10T14:30:00Z");
+      expect(result).toContain("2024");
+    });
+
+    it("formatCurrency formats number as USD", () => {
+      expect(formatCurrency(1299.99)).toContain("1,299.99");
+      expect(formatCurrency(1299.99)).toContain("$");
+    });
+
+    it("formatCurrency returns em-dash for null", () => {
+      expect(formatCurrency(null)).toBe("—");
+    });
+
+    it("formatNumber formats with grouping", () => {
+      expect(formatNumber(1234567, { useGrouping: true })).toContain(",");
+    });
+
+    it("formatBoolean returns Yes/No by default", () => {
+      expect(formatBoolean(true)).toBe("Yes");
+      expect(formatBoolean(false)).toBe("No");
+    });
+
+    it("formatBoolean accepts custom labels", () => {
+      expect(formatBoolean(true, "Active", "Inactive")).toBe("Active");
+      expect(formatBoolean(false, "Active", "Inactive")).toBe("Inactive");
+    });
+
+    it("createBadgeCell renders a badge span", () => {
+      const cols: DataTableColumnDef<Person>[] = [
+        { accessorKey: "name", header: "Name" },
+        {
+          accessorKey: "role",
+          header: "Role",
+          cell: createBadgeCell({
+            values: {
+              admin:  { label: "Admin",  className: "bg-blue-100 text-blue-800" },
+              editor: { label: "Editor", className: "bg-purple-100 text-purple-800" },
+            },
+          }),
+        },
+      ];
+      render(
+        <DataTable columns={cols} data={PEOPLE} enablePagination={false} enableGlobalFilter={false} />
+      );
+      // Alice and Carol are admins → should show "Admin" badge
+      const badges = screen.getAllByText("Admin");
+      expect(badges.length).toBeGreaterThan(0);
+      expect(badges[0].tagName.toLowerCase()).toBe("span");
+    });
+  });
+
+  // ── Phase 2: Row Expansion ────────────────────────────────────────────────
+
+  describe("Row Expansion", () => {
+    it("shows expand toggles when renderSubRow is provided", () => {
+      setup({ renderSubRow: () => <div>Details</div>, enablePagination: false });
+      const expandButtons = screen.getAllByRole("button", { name: /expand row/i });
+      expect(expandButtons.length).toBe(PEOPLE.length);
+    });
+
+    it("expands a row on toggle click", async () => {
+      const user = userEvent.setup();
+      setup({ renderSubRow: (row) => <div>Detail: {row.name}</div>, enablePagination: false });
+      expect(screen.queryByText("Detail: Alice")).not.toBeInTheDocument();
+      const [firstToggle] = screen.getAllByRole("button", { name: /expand row/i });
+      await user.click(firstToggle);
+      expect(screen.getByText("Detail: Alice")).toBeInTheDocument();
+    });
+
+    it("collapses a row on second toggle click", async () => {
+      const user = userEvent.setup();
+      setup({ renderSubRow: (row) => <div>Detail: {row.name}</div>, enablePagination: false });
+      const [firstToggle] = screen.getAllByRole("button", { name: /expand row/i });
+      await user.click(firstToggle); // expand
+      expect(screen.getByText("Detail: Alice")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: /collapse row/i }));
+      expect(screen.queryByText("Detail: Alice")).not.toBeInTheDocument();
+    });
+  });
+
+  // ── Phase 2: Pinned Columns ───────────────────────────────────────────────
+
+  describe("Pinned Columns", () => {
+    it("applies sticky style to left-pinned column headers", () => {
+      const cols: DataTableColumnDef<Person>[] = [
+        { accessorKey: "name", header: "Name", pin: "left", size: 120 },
+        { accessorKey: "role", header: "Role" },
+      ];
+      render(
+        <DataTable columns={cols} data={PEOPLE} enablePagination={false} enableGlobalFilter={false} />
+      );
+      const nameHeader = screen.getByText("Name").closest("th");
+      expect(nameHeader).toHaveStyle({ position: "sticky" });
+    });
+
+    it("applies sticky style to right-pinned column headers", () => {
+      const cols: DataTableColumnDef<Person>[] = [
+        { accessorKey: "name", header: "Name" },
+        { accessorKey: "role", header: "Role", pin: "right", size: 100 },
+      ];
+      render(
+        <DataTable columns={cols} data={PEOPLE} enablePagination={false} enableGlobalFilter={false} />
+      );
+      const roleHeader = screen.getByText("Role").closest("th");
+      expect(roleHeader).toHaveStyle({ position: "sticky" });
+    });
+  });
+
+  // ── Phase 2: Server-side Mode ─────────────────────────────────────────────
+
+  describe("Server-side Mode", () => {
+    function makeFetch(
+      result: DataTableFetchResult<Person>
+    ): (p: DataTableFetchParams) => Promise<DataTableFetchResult<Person>> {
+      return vi.fn().mockResolvedValue(result);
+    }
+
+    it("calls fetchData on mount and renders returned rows", async () => {
+      const fetchData = makeFetch({ data: [PEOPLE[0]], pageCount: 1 });
+      render(
+        <DataTable<Person>
+          columns={COLUMNS}
+          data={[]}
+          fetchData={fetchData}
+          enablePagination={false}
+          enableGlobalFilter={false}
+        />
+      );
+      // Shows skeleton while loading
+      expect(document.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+      // After fetch resolves, shows data
+      await waitFor(() => expect(screen.getByText("Alice")).toBeInTheDocument());
+      expect(fetchData).toHaveBeenCalledTimes(1);
+    });
+
+    it("re-fetches when global filter changes", async () => {
+      const user = userEvent.setup();
+      const fetchData = makeFetch({ data: PEOPLE, pageCount: 1 });
+      render(
+        <DataTable<Person>
+          columns={COLUMNS}
+          data={[]}
+          fetchData={fetchData}
+          enableGlobalFilter
+          enablePagination={false}
+        />
+      );
+      await waitFor(() => expect(screen.getByText("Alice")).toBeInTheDocument());
+      const search = screen.getByPlaceholderText("Search…");
+      await user.type(search, "x");
+      await waitFor(() => expect(fetchData).toHaveBeenCalledTimes(2));
+    });
+
+    it("shows error message when fetchData rejects", async () => {
+      const fetchData = vi.fn().mockRejectedValue(new Error("Server error"));
+      render(
+        <DataTable<Person>
+          columns={COLUMNS}
+          data={[]}
+          fetchData={fetchData}
+          enablePagination={false}
+          enableGlobalFilter={false}
+        />
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Server error")).toBeInTheDocument()
+      );
+    });
+
+    it("passes sorting state to fetchData", async () => {
+      const user = userEvent.setup();
+      const fetchData = makeFetch({ data: PEOPLE, pageCount: 1 });
+      render(
+        <DataTable<Person>
+          columns={COLUMNS}
+          data={[]}
+          fetchData={fetchData}
+          enableSorting
+          enablePagination={false}
+          enableGlobalFilter={false}
+        />
+      );
+      await waitFor(() => expect(screen.getByText("Alice")).toBeInTheDocument());
+      await user.click(screen.getByText("Name"));
+      await waitFor(() => expect(fetchData).toHaveBeenCalledTimes(2));
+      const lastCall = (fetchData as ReturnType<typeof vi.fn>).mock.calls[1][0] as DataTableFetchParams;
+      expect(lastCall.sorting).toHaveLength(1);
+      expect(lastCall.sorting[0].id).toBe("name");
+    });
+
+    it("passes pagination params to fetchData", async () => {
+      const user = userEvent.setup();
+      const fetchData = makeFetch({ data: PEOPLE.slice(0, 2), pageCount: 2 });
+      render(
+        <DataTable<Person>
+          columns={COLUMNS}
+          data={[]}
+          fetchData={fetchData}
+          enablePagination
+          defaultPageSize={2}
+          enableGlobalFilter={false}
+        />
+      );
+      await waitFor(() => expect(screen.getByText("Alice")).toBeInTheDocument());
+      await user.click(screen.getByText("›")); // next page
+      await waitFor(() => expect(fetchData).toHaveBeenCalledTimes(2));
+      const lastCall = (fetchData as ReturnType<typeof vi.fn>).mock.calls[1][0] as DataTableFetchParams;
+      expect(lastCall.pageIndex).toBe(1);
+      expect(lastCall.pageSize).toBe(2);
+    });
   });
 });

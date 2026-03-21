@@ -1,5 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { DataTable, type DataTableColumnDef } from "./data-table";
+import {
+  DataTable,
+  type DataTableColumnDef,
+  type DataTableFetchParams,
+  type DataTableFetchResult,
+  createBadgeCell,
+  formatDate,
+  formatCurrency,
+  formatNumber,
+  formatBoolean,
+} from "./data-table";
 import { Button } from "./button";
 
 // ─── Sample Data ──────────────────────────────────────────────────────────────
@@ -254,4 +264,199 @@ export const FullFeatured: Story = {
       </Button>
     ),
   },
+};
+
+// ─── Phase 2 Stories ──────────────────────────────────────────────────────────
+
+// ── Cell Formatters ──────────────────────────────────────────────────────────
+
+interface Product {
+  id: number;
+  name: string;
+  price: number;
+  stock: number;
+  available: boolean;
+  listedAt: string;
+  updatedAt: string;
+  category: "electronics" | "clothing" | "food";
+}
+
+const PRODUCTS: Product[] = [
+  { id: 1, name: "Laptop Pro", price: 1299.99, stock: 45, available: true,  listedAt: "2024-01-15", updatedAt: "2024-03-10T14:30:00Z", category: "electronics" },
+  { id: 2, name: "T-Shirt XL",  price: 24.95,  stock: 200, available: true,  listedAt: "2023-11-01", updatedAt: "2024-02-28T09:15:00Z", category: "clothing" },
+  { id: 3, name: "Organic Oats", price: 6.49,  stock: 0,   available: false, listedAt: "2024-02-20", updatedAt: "2024-03-18T07:00:00Z", category: "food" },
+  { id: 4, name: "USB-C Hub",   price: 49.99,  stock: 12,  available: true,  listedAt: "2023-09-05", updatedAt: "2024-03-01T11:45:00Z", category: "electronics" },
+];
+
+const PRODUCT_COLUMNS: DataTableColumnDef<Product>[] = [
+  { accessorKey: "name", header: "Name" },
+  {
+    accessorKey: "price",
+    header: "Price",
+    cell: ({ getValue }) => formatCurrency(getValue()),
+  },
+  {
+    accessorKey: "stock",
+    header: "Stock",
+    cell: ({ getValue }) => formatNumber(getValue(), { useGrouping: true }),
+  },
+  {
+    accessorKey: "available",
+    header: "Available",
+    cell: ({ getValue }) => formatBoolean(getValue()),
+  },
+  {
+    accessorKey: "listedAt",
+    header: "Listed",
+    cell: ({ getValue }) => formatDate(getValue()),
+  },
+  {
+    accessorKey: "category",
+    header: "Category",
+    cell: createBadgeCell({
+      values: {
+        electronics: { label: "Electronics", className: "bg-blue-100 text-blue-800" },
+        clothing:    { label: "Clothing",    className: "bg-purple-100 text-purple-800" },
+        food:        { label: "Food",        className: "bg-green-100 text-green-800" },
+      },
+    }),
+  },
+];
+
+export const CellFormatters: Story = {
+  name: "Cell Formatters (date, currency, number, boolean, badge)",
+  render: () => (
+    <DataTable<Product>
+      columns={PRODUCT_COLUMNS}
+      data={PRODUCTS}
+      enableGlobalFilter={false}
+      enablePagination={false}
+    />
+  ),
+};
+
+// ── Row Expansion ─────────────────────────────────────────────────────────────
+
+export const RowExpansion: Story = {
+  name: "Row Expansion (sub-row detail panel)",
+  render: () => (
+    <DataTable<Person>
+      columns={COLUMNS}
+      data={PEOPLE}
+      enablePagination={false}
+      renderSubRow={(row) => (
+        <div className="px-6 py-3 text-sm text-muted-foreground">
+          <strong>ID:</strong> {row.id} &nbsp;·&nbsp;
+          <strong>Email:</strong> {row.email} &nbsp;·&nbsp;
+          <strong>Score:</strong> {row.score} &nbsp;·&nbsp;
+          <strong>Joined:</strong> {row.joinDate}
+        </div>
+      )}
+    />
+  ),
+};
+
+// ── Pinned Columns ────────────────────────────────────────────────────────────
+
+const PINNED_COLUMNS: DataTableColumnDef<Person>[] = [
+  { accessorKey: "name",     header: "Name",      size: 160, pin: "left" },
+  { accessorKey: "email",    header: "Email",     size: 220 },
+  { accessorKey: "role",     header: "Role",      size: 120 },
+  { accessorKey: "joinDate", header: "Join Date", size: 130 },
+  { accessorKey: "score",    header: "Score",     size: 100 },
+  {
+    accessorKey: "status",
+    header: "Status",
+    size: 120,
+    pin: "right",
+    cell: createBadgeCell({
+      values: {
+        active:   { label: "Active",   className: "bg-green-100 text-green-800" },
+        inactive: { label: "Inactive", className: "bg-red-100 text-red-800" },
+      },
+    }),
+  },
+];
+
+export const PinnedColumns: Story = {
+  name: "Pinned/Frozen Columns (left + right)",
+  render: () => (
+    <div style={{ width: 480 }}>
+      <DataTable<Person>
+        columns={PINNED_COLUMNS}
+        data={PEOPLE}
+        enablePagination={false}
+        enableGlobalFilter={false}
+      />
+    </div>
+  ),
+};
+
+// ── Server-side Mode ──────────────────────────────────────────────────────────
+
+function simulateFetch(
+  allData: Person[]
+): (params: DataTableFetchParams) => Promise<DataTableFetchResult<Person>> {
+  return async ({ pageIndex, pageSize, sorting, globalFilter }) => {
+    await new Promise((r) => setTimeout(r, 400)); // simulate network delay
+
+    let filtered = [...allData];
+
+    if (globalFilter) {
+      const q = globalFilter.toLowerCase();
+      filtered = filtered.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.email.toLowerCase().includes(q) ||
+          p.role.toLowerCase().includes(q)
+      );
+    }
+
+    if (sorting.length > 0) {
+      const { id, desc } = sorting[0];
+      filtered.sort((a, b) => {
+        const av = (a as Record<string, unknown>)[id];
+        const bv = (b as Record<string, unknown>)[id];
+        const cmp = String(av ?? "").localeCompare(String(bv ?? ""), undefined, { numeric: true });
+        return desc ? -cmp : cmp;
+      });
+    }
+
+    const pageCount = Math.ceil(filtered.length / pageSize);
+    const page = filtered.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
+
+    return { data: page, pageCount };
+  };
+}
+
+export const ServerSideMode: Story = {
+  name: "Server-side Mode (async fetch, sort, filter, paginate)",
+  render: () => (
+    <DataTable<Person>
+      columns={COLUMNS}
+      data={[]}
+      fetchData={simulateFetch(PEOPLE)}
+      enableSorting
+      enableGlobalFilter
+      enablePagination
+      defaultPageSize={5}
+      pageSizeOptions={[5, 10]}
+    />
+  ),
+};
+
+// ── Server-side Error ─────────────────────────────────────────────────────────
+
+export const ServerSideError: Story = {
+  name: "Server-side Mode — fetch error",
+  render: () => (
+    <DataTable<Person>
+      columns={COLUMNS}
+      data={[]}
+      fetchData={async () => {
+        await new Promise((r) => setTimeout(r, 300));
+        throw new Error("Network error: failed to fetch /api/people");
+      }}
+    />
+  ),
 };

@@ -7,6 +7,7 @@ import {
   type RowSelectionState,
   type FilterFn,
   type Row,
+  type ColumnPinningState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -57,6 +58,8 @@ export type DataTableColumnDef<TData, TValue = unknown> = ColumnDef<
   TValue
 > & {
   filterMeta?: FilterMeta;
+  /** Pin column to "left" or "right" edge (sticky/frozen) */
+  pin?: "left" | "right";
 };
 
 // ─── Row Action ──────────────────────────────────────────────────────────────
@@ -69,22 +72,144 @@ export interface DataTableRowAction<TData> {
   hidden?: (row: TData) => boolean;
 }
 
+// ─── Server-side Fetch API ────────────────────────────────────────────────────
+
+export interface DataTableFetchParams {
+  pageIndex: number;
+  pageSize: number;
+  sorting: SortingState;
+  columnFilters: ColumnFiltersState;
+  globalFilter: string;
+}
+
+export interface DataTableFetchResult<TData> {
+  data: TData[];
+  /** Total number of pages for pagination */
+  pageCount: number;
+}
+
+// ─── Cell Formatters ──────────────────────────────────────────────────────────
+
+/** Format an ISO date string or Date as a locale date (e.g. "Jan 15, 2024") */
+export function formatDate(value: unknown, locale = "en-US"): string {
+  if (value == null || value === "") return "—";
+  const d = value instanceof Date ? value : new Date(String(value));
+  if (isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString(locale, { year: "numeric", month: "short", day: "numeric" });
+}
+
+/** Format an ISO date-time string or Date as a locale date + time */
+export function formatDateTime(value: unknown, locale = "en-US"): string {
+  if (value == null || value === "") return "—";
+  const d = value instanceof Date ? value : new Date(String(value));
+  if (isNaN(d.getTime())) return String(value);
+  return d.toLocaleString(locale, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/** Format a number as currency (e.g. "$1,234.56") */
+export function formatCurrency(
+  value: unknown,
+  currency = "USD",
+  locale = "en-US"
+): string {
+  if (value == null || value === "") return "—";
+  const n = Number(value);
+  if (isNaN(n)) return String(value);
+  return new Intl.NumberFormat(locale, { style: "currency", currency }).format(n);
+}
+
+/** Format a number with optional Intl options */
+export function formatNumber(
+  value: unknown,
+  options?: Intl.NumberFormatOptions,
+  locale = "en-US"
+): string {
+  if (value == null || value === "") return "—";
+  const n = Number(value);
+  if (isNaN(n)) return String(value);
+  return new Intl.NumberFormat(locale, options).format(n);
+}
+
+/** Format a boolean as Yes/No (or custom labels) */
+export function formatBoolean(
+  value: unknown,
+  trueLabel = "Yes",
+  falseLabel = "No"
+): string {
+  if (value == null) return "—";
+  return value ? trueLabel : falseLabel;
+}
+
+/** Config for badge/status cell */
+export interface BadgeCellConfig {
+  /** Map of raw value → display config */
+  values: Record<string, { label?: string; className: string }>;
+  /** Fallback config for values not in the map */
+  fallback?: { label?: string; className: string };
+}
+
+/**
+ * Factory that creates a TanStack cell renderer for badge/status values.
+ *
+ * @example
+ * ```tsx
+ * {
+ *   accessorKey: "status",
+ *   header: "Status",
+ *   cell: createBadgeCell({
+ *     values: {
+ *       active: { label: "Active", className: "bg-green-100 text-green-800" },
+ *       inactive: { label: "Inactive", className: "bg-red-100 text-red-800" },
+ *     },
+ *   }),
+ * }
+ * ```
+ */
+export function createBadgeCell<TData>(
+  config: BadgeCellConfig
+): ColumnDef<TData>["cell"] {
+  return ({ getValue }) => {
+    const value = String(getValue() ?? "");
+    const cfg = config.values[value] ?? config.fallback;
+    if (!cfg) return value;
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+          cfg.className
+        )}
+      >
+        {cfg.label ?? value}
+      </span>
+    );
+  };
+}
+
 // ─── DataTable Props ─────────────────────────────────────────────────────────
 
 export interface DataTableProps<TData> {
   /** Column definitions */
   columns: DataTableColumnDef<TData>[];
-  /** Row data */
+  /**
+   * Row data (client-side mode).
+   * Ignored when `fetchData` is provided (server-side mode).
+   */
   data: TData[];
-  /** Loading state — shows skeleton rows */
+  /** Loading state — shows skeleton rows (client-side mode) */
   isLoading?: boolean;
-  /** Error state — shows error message */
+  /** Error state — shows error message (client-side mode) */
   error?: string | null;
   /** Empty state message */
   emptyMessage?: string;
   /** Called when a row is clicked */
   onRowClick?: (row: TData) => void;
-  /** Per-row action buttons or context menu items */
+  /** Per-row action buttons */
   rowActions?: DataTableRowAction<TData>[];
   /** Show row selection checkboxes */
   enableRowSelection?: boolean;
@@ -118,6 +243,28 @@ export interface DataTableProps<TData> {
   toolbarActionsSlot?: React.ReactNode;
   /** Additional class name for the wrapper */
   className?: string;
+
+  // ── Phase 2 additions ──────────────────────────────────────────────────────
+
+  /**
+   * Async data fetcher for server-side mode.
+   * When provided, the component manages sorting/filtering/pagination server-side.
+   * The `data` prop is ignored in this mode.
+   */
+  fetchData?: (
+    params: DataTableFetchParams
+  ) => Promise<DataTableFetchResult<TData>>;
+
+  /**
+   * Render a collapsible detail panel beneath a row.
+   * When provided, an expand toggle is added to each row.
+   *
+   * @example
+   * ```tsx
+   * renderSubRow={(row) => <div className="p-4">{row.description}</div>}
+   * ```
+   */
+  renderSubRow?: (row: TData) => React.ReactNode;
 }
 
 // ─── Skeleton Row ─────────────────────────────────────────────────────────────
@@ -262,7 +409,7 @@ function exportToCsv<TData>(
   filename: string
 ) {
   const visibleColumns = columns.filter(
-    (col) => col.id !== "__select__" && col.id !== "__actions__"
+    (col) => col.id !== "__select__" && col.id !== "__actions__" && col.id !== "__expand__"
   );
 
   const headers = visibleColumns.map((col) => {
@@ -294,6 +441,22 @@ function exportToCsv<TData>(
   URL.revokeObjectURL(url);
 }
 
+// ─── Pinned Column Style Helpers ─────────────────────────────────────────────
+
+function getPinnedStyle(
+  isPinned: "left" | "right" | false,
+  leftOffset: number,
+  rightOffset: number
+): React.CSSProperties {
+  if (!isPinned) return {};
+  return {
+    position: "sticky",
+    left: isPinned === "left" ? leftOffset : undefined,
+    right: isPinned === "right" ? rightOffset : undefined,
+    zIndex: 1,
+  };
+}
+
 // ─── DataTable ────────────────────────────────────────────────────────────────
 
 export function DataTable<TData>({
@@ -320,7 +483,20 @@ export function DataTable<TData>({
   refreshSlot,
   toolbarActionsSlot,
   className,
+  fetchData,
+  renderSubRow,
 }: DataTableProps<TData>) {
+  const isServerMode = !!fetchData;
+
+  // ── Server-side state ────────────────────────────────────────────────────
+
+  const [serverData, setServerData] = React.useState<TData[]>([]);
+  const [serverPageCount, setServerPageCount] = React.useState(0);
+  const [serverLoading, setServerLoading] = React.useState(false);
+  const [serverError, setServerError] = React.useState<string | null>(null);
+
+  // ── Table state ──────────────────────────────────────────────────────────
+
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = React.useState("");
@@ -328,9 +504,77 @@ export function DataTable<TData>({
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   const [visibilityOpen, setVisibilityOpen] = React.useState(false);
 
-  // Build columns: prepend selection column, append actions column if needed
+  // Controlled pagination state for server-side mode (and client-side too for uniformity)
+  const [pagination, setPagination] = React.useState({
+    pageIndex: 0,
+    pageSize: defaultPageSize,
+  });
+
+  // ── Row expansion state ──────────────────────────────────────────────────
+
+  const [expandedRowIds, setExpandedRowIds] = React.useState<Set<string>>(
+    new Set()
+  );
+
+  const toggleRowExpanded = React.useCallback((rowId: string) => {
+    setExpandedRowIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowId)) {
+        next.delete(rowId);
+      } else {
+        next.add(rowId);
+      }
+      return next;
+    });
+  }, []);
+
+  // ── Column pinning state ─────────────────────────────────────────────────
+
+  const initialPinning = React.useMemo<ColumnPinningState>(() => {
+    const left: string[] = [];
+    const right: string[] = [];
+    for (const col of columnDefs) {
+      const id = (col as { accessorKey?: string }).accessorKey ?? col.id;
+      if (id) {
+        if (col.pin === "left") left.push(id);
+        if (col.pin === "right") right.push(id);
+      }
+    }
+    return { left, right };
+  }, [columnDefs]);
+
+  const [columnPinning] = React.useState<ColumnPinningState>(initialPinning);
+  const hasPinnedColumns =
+    (columnPinning.left?.length ?? 0) > 0 ||
+    (columnPinning.right?.length ?? 0) > 0;
+
+  // ── Build column list ────────────────────────────────────────────────────
+
   const columns = React.useMemo<ColumnDef<TData>[]>(() => {
     const cols: ColumnDef<TData>[] = [];
+
+    // Expand toggle column (leftmost)
+    if (renderSubRow) {
+      cols.push({
+        id: "__expand__",
+        header: "",
+        cell: ({ row }) => (
+          <button
+            aria-label={expandedRowIds.has(row.id) ? "Collapse row" : "Expand row"}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleRowExpanded(row.id);
+            }}
+            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            {expandedRowIds.has(row.id) ? "▾" : "▸"}
+          </button>
+        ),
+        enableSorting: false,
+        enableHiding: false,
+        size: 36,
+      });
+    }
 
     if (enableRowSelection) {
       cols.push({
@@ -402,10 +646,14 @@ export function DataTable<TData>({
     }
 
     return cols;
-  }, [columnDefs, enableRowSelection, rowActions]);
+  }, [columnDefs, enableRowSelection, rowActions, renderSubRow, expandedRowIds, toggleRowExpanded]);
+
+  // ── Table instance ───────────────────────────────────────────────────────
+
+  const effectiveData = isServerMode ? serverData : data;
 
   const table = useReactTable({
-    data,
+    data: effectiveData,
     columns,
     filterFns: {
       dateRange: dateRangeFilter as FilterFn<TData>,
@@ -417,15 +665,34 @@ export function DataTable<TData>({
       globalFilter,
       columnVisibility,
       rowSelection,
+      columnPinning,
+      pagination,
     },
+    // Server-side mode: disable client-side processing
+    manualSorting: isServerMode,
+    manualFiltering: isServerMode,
+    manualPagination: isServerMode,
+    pageCount: isServerMode ? serverPageCount : undefined,
     enableRowSelection,
     enableMultiRowSelection: enableRowSelection,
     enableSorting,
     enableMultiSort,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onGlobalFilterChange: setGlobalFilter,
+    enableColumnPinning: hasPinnedColumns,
+    onSortingChange: (updater) => {
+      setSorting(updater);
+      // Reset to first page on sort change
+      if (isServerMode) setPagination((p) => ({ ...p, pageIndex: 0 }));
+    },
+    onColumnFiltersChange: (updater) => {
+      setColumnFilters(updater);
+      if (isServerMode) setPagination((p) => ({ ...p, pageIndex: 0 }));
+    },
+    onGlobalFilterChange: (updater) => {
+      setGlobalFilter(updater);
+      if (isServerMode) setPagination((p) => ({ ...p, pageIndex: 0 }));
+    },
     onColumnVisibilityChange: setColumnVisibility,
+    onPaginationChange: setPagination,
     onRowSelectionChange: (updater) => {
       const next =
         typeof updater === "function" ? updater(rowSelection) : updater;
@@ -433,24 +700,62 @@ export function DataTable<TData>({
       if (onSelectionChange) {
         const selected = Object.keys(next)
           .filter((key) => next[key])
-          .map((key) => data[Number(key)]);
+          .map((key) => effectiveData[Number(key)]);
         onSelectionChange(selected);
       }
     },
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: isServerMode ? undefined : getFilteredRowModel(),
+    getSortedRowModel: isServerMode ? undefined : getSortedRowModel(),
     getPaginationRowModel: enablePagination ? getPaginationRowModel() : undefined,
-    initialState: {
-      pagination: { pageSize: defaultPageSize },
-    },
   });
+
+  // ── Server-side fetch effect ─────────────────────────────────────────────
+
+  React.useEffect(() => {
+    if (!fetchData) return;
+    let cancelled = false;
+
+    setServerLoading(true);
+    setServerError(null);
+
+    fetchData({
+      pageIndex: pagination.pageIndex,
+      pageSize: pagination.pageSize,
+      sorting,
+      columnFilters,
+      globalFilter,
+    })
+      .then((result) => {
+        if (!cancelled) {
+          setServerData(result.data);
+          setServerPageCount(result.pageCount);
+          setServerLoading(false);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          const msg =
+            err instanceof Error ? err.message : "Failed to load data";
+          setServerError(msg);
+          setServerLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchData, pagination.pageIndex, pagination.pageSize, sorting, columnFilters, globalFilter]);
+
+  const effectiveLoading = isServerMode ? serverLoading : isLoading;
+  const effectiveError = isServerMode ? serverError : error;
 
   const selectedRows = table
     .getSelectedRowModel()
     .rows.map((r) => r.original);
 
-  // ─── Toolbar ────────────────────────────────────────────────────────────────
+  // ── Toolbar ──────────────────────────────────────────────────────────────
 
   const toolbar = (
     <div className="flex flex-wrap items-center justify-between gap-2 py-2">
@@ -533,7 +838,7 @@ export function DataTable<TData>({
     </div>
   );
 
-  // ─── Column Filter Row ───────────────────────────────────────────────────────
+  // ── Column Filter Row ─────────────────────────────────────────────────────
 
   const columnFilterRow = enableColumnFilters && (
     <TableRow>
@@ -555,9 +860,9 @@ export function DataTable<TData>({
     </TableRow>
   );
 
-  // ─── Pagination ───────────────────────────────────────────────────────────────
+  // ── Pagination ────────────────────────────────────────────────────────────
 
-  const pagination = enablePagination && (
+  const paginationRow = enablePagination && (
     <div className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
       <div className="flex items-center gap-2">
         <span className="text-muted-foreground">Rows per page:</span>
@@ -614,71 +919,92 @@ export function DataTable<TData>({
     </div>
   );
 
-  // ─── Render ──────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className={cn("space-y-2", className)}>
       {toolbar}
-      <div className="rounded-md border">
+      <div className={cn("rounded-md border", hasPinnedColumns && "overflow-x-auto")}>
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead
-                    key={header.id}
-                    colSpan={header.colSpan}
-                    style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
-                  >
-                    {header.isPlaceholder ? null : (
-                      <div
-                        className={cn(
-                          "flex select-none items-center gap-1",
-                          header.column.getCanSort() &&
-                            "cursor-pointer hover:text-foreground"
-                        )}
-                        onClick={
-                          header.column.getCanSort()
-                            ? header.column.getToggleSortingHandler()
-                            : undefined
-                        }
-                      >
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                        {header.column.getIsSorted() === "asc" && (
-                          <span aria-hidden>↑</span>
-                        )}
-                        {header.column.getIsSorted() === "desc" && (
-                          <span aria-hidden>↓</span>
-                        )}
-                        {header.column.getIsSorted() === false &&
-                          header.column.getCanSort() && (
-                            <span aria-hidden className="text-muted-foreground/40">
-                              ↕
-                            </span>
+                {headerGroup.headers.map((header) => {
+                  const isPinned = header.column.getIsPinned();
+                  const pinnedStyle = isPinned
+                    ? getPinnedStyle(
+                        isPinned,
+                        header.column.getStart("left"),
+                        header.column.getAfter("right")
+                      )
+                    : {};
+                  return (
+                    <TableHead
+                      key={header.id}
+                      colSpan={header.colSpan}
+                      style={{
+                        width:
+                          header.getSize() !== 150
+                            ? header.getSize()
+                            : undefined,
+                        ...pinnedStyle,
+                      }}
+                      className={cn(
+                        isPinned && "bg-background",
+                        isPinned === "left" && "shadow-[inset_-1px_0_0_hsl(var(--border))]",
+                        isPinned === "right" && "shadow-[inset_1px_0_0_hsl(var(--border))]"
+                      )}
+                    >
+                      {header.isPlaceholder ? null : (
+                        <div
+                          className={cn(
+                            "flex select-none items-center gap-1",
+                            header.column.getCanSort() &&
+                              "cursor-pointer hover:text-foreground"
                           )}
-                      </div>
-                    )}
-                  </TableHead>
-                ))}
+                          onClick={
+                            header.column.getCanSort()
+                              ? header.column.getToggleSortingHandler()
+                              : undefined
+                          }
+                        >
+                          {flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                          {header.column.getIsSorted() === "asc" && (
+                            <span aria-hidden>↑</span>
+                          )}
+                          {header.column.getIsSorted() === "desc" && (
+                            <span aria-hidden>↓</span>
+                          )}
+                          {header.column.getIsSorted() === false &&
+                            header.column.getCanSort() && (
+                              <span aria-hidden className="text-muted-foreground/40">
+                                ↕
+                              </span>
+                            )}
+                        </div>
+                      )}
+                    </TableHead>
+                  );
+                })}
               </TableRow>
             ))}
             {columnFilterRow}
           </TableHeader>
           <TableBody>
-            {isLoading ? (
+            {effectiveLoading ? (
               Array.from({ length: defaultPageSize }).map((_, i) => (
                 <SkeletonRow key={i} columnCount={columns.length} />
               ))
-            ) : error ? (
+            ) : effectiveError ? (
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
                   className="h-24 text-center text-destructive"
                 >
-                  {error}
+                  {effectiveError}
                 </TableCell>
               </TableRow>
             ) : table.getRowModel().rows.length === 0 ? (
@@ -691,28 +1017,58 @@ export function DataTable<TData>({
                 </TableCell>
               </TableRow>
             ) : (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() ? "selected" : undefined}
-                  onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                  className={cn(onRowClick && "cursor-pointer")}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              table.getRowModel().rows.flatMap((row) => {
+                const isExpanded = expandedRowIds.has(row.id);
+                return [
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() ? "selected" : undefined}
+                    onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                    className={cn(onRowClick && "cursor-pointer")}
+                  >
+                    {row.getVisibleCells().map((cell) => {
+                      const isPinned = cell.column.getIsPinned();
+                      const pinnedStyle = isPinned
+                        ? getPinnedStyle(
+                            isPinned,
+                            cell.column.getStart("left"),
+                            cell.column.getAfter("right")
+                          )
+                        : {};
+                      return (
+                        <TableCell
+                          key={cell.id}
+                          style={pinnedStyle}
+                          className={cn(
+                            isPinned && "bg-background",
+                            isPinned === "left" &&
+                              "shadow-[inset_-1px_0_0_hsl(var(--border))]",
+                            isPinned === "right" &&
+                              "shadow-[inset_1px_0_0_hsl(var(--border))]"
+                          )}
+                        >
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>,
+                  isExpanded && renderSubRow ? (
+                    <TableRow key={`${row.id}__sub`} className="bg-muted/30">
+                      <TableCell colSpan={columns.length} className="p-0">
+                        {renderSubRow(row.original)}
+                      </TableCell>
+                    </TableRow>
+                  ) : null,
+                ].filter(Boolean) as React.ReactElement[];
+              })
             )}
           </TableBody>
         </Table>
       </div>
-      {pagination}
+      {paginationRow}
     </div>
   );
 }
