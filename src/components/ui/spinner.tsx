@@ -72,4 +72,5 @@ const Loader = React.forwardRef<HTMLDivElement, LoaderProps>(
 );
 Loader.displayName = "Loader";
 
+// eslint-disable-next-line react-refresh/only-export-components
 export { Spinner, Loader, spinnerVariants };
