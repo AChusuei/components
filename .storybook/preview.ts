@@ -1,5 +1,6 @@
-import type { Preview } from "@storybook/react";
+import type { Preview, Decorator } from "@storybook/react";
 import { create } from "@storybook/theming";
+import React from "react";
 import "../src/styles/globals.css";
 
 const lightTheme = create({
@@ -38,7 +39,14 @@ const darkTheme = create({
   inputTextColor: "hsl(210 40% 98%)",
 });
 
+const withDarkClass: Decorator = (Story, context) => {
+  const isDark = context.globals?.darkMode === "dark";
+  document.documentElement.classList.toggle("dark", isDark);
+  return React.createElement(Story);
+};
+
 const preview: Preview = {
+  decorators: [withDarkClass],
   parameters: {
     controls: {
       matchers: {
