@@ -1,0 +1,27 @@
+/* Dark mode overrides for Storybook docs page elements */
+html.dark .sbdocs-wrapper,
+html.dark .sbdocs-content,
+html.dark .sb-main-padded,
+html.dark #storybook-root,
+html.dark .docs-story {
+  background-color: hsl(222.2 84% 4.9%) !important;
+  color: hsl(210 40% 98%) !important;
+}
+
+html.dark h1,
+html.dark h2,
+html.dark h3,
+html.dark p,
+html.dark td,
+html.dark th {
+  color: hsl(210 40% 98%) !important;
+}
+
+html.dark table {
+  border-color: hsl(217.2 32.6% 17.5%) !important;
+}
+
+html.dark tr {
+  border-color: hsl(217.2 32.6% 17.5%) !important;
+  background-color: hsl(222.2 84% 4.9%) !important;
+}
