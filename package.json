@@ -33,11 +33,13 @@
     "react-dom": "^18.0.0"
   },
   "dependencies": {
+    "@radix-ui/react-progress": "^1.1.8",
     "@radix-ui/react-slot": "^1.1.1",
     "@tanstack/react-table": "^8.21.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.469.0",
+    "react-dropzone": "^15.0.0",
     "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
