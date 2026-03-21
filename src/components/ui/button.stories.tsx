@@ -77,3 +77,15 @@ export const Disabled: Story = {
     children: "Disabled",
   },
 };
+
+export const Light: Story = {
+  name: "Light Mode",
+  args: { children: "Button" },
+  parameters: { darkMode: { current: "light" } },
+};
+
+export const Dark: Story = {
+  name: "Dark Mode",
+  args: { children: "Button" },
+  parameters: { darkMode: { current: "dark" } },
+};

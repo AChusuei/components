@@ -217,6 +217,18 @@ export const ColumnVisibility: Story = {
   },
 };
 
+export const Light: Story = {
+  name: "Light Mode",
+  args: { columns: COLUMNS, data: PEOPLE },
+  parameters: { darkMode: { current: "light" } },
+};
+
+export const Dark: Story = {
+  name: "Dark Mode",
+  args: { columns: COLUMNS, data: PEOPLE },
+  parameters: { darkMode: { current: "dark" } },
+};
+
 export const FullFeatured: Story = {
   name: "Full Featured",
   args: {

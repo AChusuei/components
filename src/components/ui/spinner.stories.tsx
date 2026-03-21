@@ -71,3 +71,15 @@ export const OverlayLoader: StoryObj<typeof Loader> = {
     layout: "centered",
   },
 };
+
+export const Light: Story = {
+  name: "Light Mode",
+  args: { color: "primary" },
+  parameters: { darkMode: { current: "light" } },
+};
+
+export const Dark: Story = {
+  name: "Dark Mode",
+  args: { color: "primary" },
+  parameters: { darkMode: { current: "dark" } },
+};
