@@ -9,5 +9,5 @@
 {"key":"compaction_enabled","value":"false"}
 {"key":"issue_prefix","value":"co"}
 {"key":"kv.memory.every-component-must-have-a-storybook-story-with","value":"Every component must have a Storybook story with explicit light AND dark mode story exports. Dark mode story is part of the definition of done for any new component — not optional."}
-{"key":"schema_version","value":"6"}
+{"key":"schema_version","value":"7"}
 {"key":"types.custom","value":"agent,role,rig,convoy,slot,queue,event,message,molecule,gate,merge-request"}
