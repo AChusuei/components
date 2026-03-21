@@ -1,14 +1,19 @@
 import * as React from "react";
 import {
+  type Column,
   type ColumnDef,
   type ColumnFiltersState,
+  type ColumnPinningState,
+  type ExpandedState,
+  type FilterFn,
+  type PaginationState,
+  type Row,
+  type RowSelectionState,
   type SortingState,
   type VisibilityState,
-  type RowSelectionState,
-  type FilterFn,
-  type Row,
   flexRender,
   getCoreRowModel,
+  getExpandedRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
@@ -50,6 +55,99 @@ export type FilterMeta =
   | DateRangeFilterMeta
   | NumberRangeFilterMeta;
 
+// ─── Server-side Types ────────────────────────────────────────────────────────
+
+export interface ServerSortParam {
+  id: string;
+  desc: boolean;
+}
+
+export interface ServerFilterParam {
+  id: string;
+  value: unknown;
+}
+
+export interface ServerFetchParams {
+  /** Zero-based page index */
+  page: number;
+  pageSize: number;
+  sorting: ServerSortParam[];
+  filters: ServerFilterParam[];
+  globalFilter: string;
+}
+
+export interface ServerFetchResult<TData> {
+  data: TData[];
+  /** Total row count across all pages (used to compute page count) */
+  total: number;
+}
+
+// ─── Cell Formatter Types ─────────────────────────────────────────────────────
+
+export type CellFormatter =
+  | { type: "date"; locale?: string }
+  | { type: "datetime"; locale?: string }
+  | { type: "currency"; currency?: string; locale?: string }
+  | { type: "number"; decimals?: number; locale?: string }
+  | { type: "boolean"; trueLabel?: string; falseLabel?: string }
+  | {
+      type: "badge";
+      variants?: Record<string, { label?: string; className?: string }>;
+    };
+
+/**
+ * Format a raw cell value with a built-in formatter.
+ * Can also be used standalone outside of DataTable.
+ */
+export function formatCellValue(
+  value: unknown,
+  formatter: CellFormatter
+): React.ReactNode {
+  if (value == null) return "—";
+
+  switch (formatter.type) {
+    case "date": {
+      const d = value instanceof Date ? value : new Date(String(value));
+      if (isNaN(d.getTime())) return String(value);
+      return d.toLocaleDateString(formatter.locale ?? undefined);
+    }
+    case "datetime": {
+      const d = value instanceof Date ? value : new Date(String(value));
+      if (isNaN(d.getTime())) return String(value);
+      return d.toLocaleString(formatter.locale ?? undefined);
+    }
+    case "currency": {
+      const num = Number(value);
+      return new Intl.NumberFormat(formatter.locale ?? undefined, {
+        style: "currency",
+        currency: formatter.currency ?? "USD",
+      }).format(num);
+    }
+    case "number": {
+      const num = Number(value);
+      return new Intl.NumberFormat(formatter.locale ?? undefined, {
+        minimumFractionDigits: formatter.decimals ?? 0,
+        maximumFractionDigits: formatter.decimals ?? 0,
+      }).format(num);
+    }
+    case "boolean": {
+      const bool = Boolean(value);
+      return bool ? (formatter.trueLabel ?? "Yes") : (formatter.falseLabel ?? "No");
+    }
+    case "badge": {
+      const key = String(value);
+      const variant = formatter.variants?.[key];
+      const label = variant?.label ?? key;
+      const className =
+        variant?.className ??
+        "rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground";
+      return <span className={className}>{label}</span>;
+    }
+    default:
+      return String(value);
+  }
+}
+
 // ─── Column Definition Extension ─────────────────────────────────────────────
 
 export type DataTableColumnDef<TData, TValue = unknown> = ColumnDef<
@@ -57,6 +155,13 @@ export type DataTableColumnDef<TData, TValue = unknown> = ColumnDef<
   TValue
 > & {
   filterMeta?: FilterMeta;
+  /** Pin column to the left or right edge (sticky). */
+  pin?: "left" | "right";
+  /**
+   * Built-in cell formatter. Applied automatically when no custom `cell`
+   * renderer is provided. Use `formatCellValue` for manual formatting.
+   */
+  formatter?: CellFormatter;
 };
 
 // ─── Row Action ──────────────────────────────────────────────────────────────
@@ -74,8 +179,17 @@ export interface DataTableRowAction<TData> {
 export interface DataTableProps<TData> {
   /** Column definitions */
   columns: DataTableColumnDef<TData>[];
-  /** Row data */
-  data: TData[];
+  /**
+   * Row data (client-side mode).
+   * Optional when `fetchData` is provided.
+   */
+  data?: TData[];
+  /**
+   * Async fetch function (server-side mode).
+   * When provided, sorting/filtering/pagination are handled server-side.
+   * Wrap in `useCallback` to keep the reference stable and avoid re-fetches.
+   */
+  fetchData?: (params: ServerFetchParams) => Promise<ServerFetchResult<TData>>;
   /** Loading state — shows skeleton rows */
   isLoading?: boolean;
   /** Error state — shows error message */
@@ -84,7 +198,7 @@ export interface DataTableProps<TData> {
   emptyMessage?: string;
   /** Called when a row is clicked */
   onRowClick?: (row: TData) => void;
-  /** Per-row action buttons or context menu items */
+  /** Per-row action buttons */
   rowActions?: DataTableRowAction<TData>[];
   /** Show row selection checkboxes */
   enableRowSelection?: boolean;
@@ -116,6 +230,15 @@ export interface DataTableProps<TData> {
   refreshSlot?: React.ReactNode;
   /** Slot for custom toolbar actions (rendered in toolbar) */
   toolbarActionsSlot?: React.ReactNode;
+  /**
+   * Enable row expansion. Requires `renderSubRow`.
+   */
+  enableRowExpansion?: boolean;
+  /**
+   * Render the expanded detail panel for a row.
+   * Only used when `enableRowExpansion` is true.
+   */
+  renderSubRow?: (row: TData) => React.ReactNode;
   /** Additional class name for the wrapper */
   className?: string;
 }
@@ -154,7 +277,9 @@ function ColumnFilterInput({
     return (
       <select
         value={(value as string) ?? ""}
-        onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value)}
+        onChange={(e) =>
+          onChange(e.target.value === "" ? undefined : e.target.value)
+        }
         className="mt-1 h-7 w-full rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
       >
         <option value="">All</option>
@@ -197,7 +322,10 @@ function ColumnFilterInput({
           type="number"
           value={range[0] ?? ""}
           onChange={(e) =>
-            onChange([e.target.value !== "" ? Number(e.target.value) : undefined, range[1]])
+            onChange([
+              e.target.value !== "" ? Number(e.target.value) : undefined,
+              range[1],
+            ])
           }
           className="h-7 w-full rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
           placeholder="Min"
@@ -206,7 +334,10 @@ function ColumnFilterInput({
           type="number"
           value={range[1] ?? ""}
           onChange={(e) =>
-            onChange([range[0], e.target.value !== "" ? Number(e.target.value) : undefined])
+            onChange([
+              range[0],
+              e.target.value !== "" ? Number(e.target.value) : undefined,
+            ])
           }
           className="h-7 w-full rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
           placeholder="Max"
@@ -294,11 +425,26 @@ function exportToCsv<TData>(
   URL.revokeObjectURL(url);
 }
 
+// ─── Pinned Column Styles ─────────────────────────────────────────────────────
+
+function getPinnedStyle<TData>(column: Column<TData>): React.CSSProperties {
+  const isPinned = column.getIsPinned();
+  if (!isPinned) return {};
+  return {
+    position: "sticky",
+    left: isPinned === "left" ? `${column.getStart("left")}px` : undefined,
+    right: isPinned === "right" ? `${column.getAfter("right")}px` : undefined,
+    zIndex: 2,
+    background: "hsl(var(--background))",
+  };
+}
+
 // ─── DataTable ────────────────────────────────────────────────────────────────
 
 export function DataTable<TData>({
   columns: columnDefs,
-  data,
+  data: dataProp,
+  fetchData,
   isLoading = false,
   error = null,
   emptyMessage = "No results.",
@@ -319,19 +465,121 @@ export function DataTable<TData>({
   exportFilename = "export",
   refreshSlot,
   toolbarActionsSlot,
+  enableRowExpansion = false,
+  renderSubRow,
   className,
 }: DataTableProps<TData>) {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-  const [globalFilter, setGlobalFilter] = React.useState("");
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
-  const [visibilityOpen, setVisibilityOpen] = React.useState(false);
+  const isServerMode = Boolean(fetchData);
 
-  // Build columns: prepend selection column, append actions column if needed
+  // ─── Server-side state ─────────────────────────────────────────────────────
+  const [serverData, setServerData] = React.useState<TData[]>([]);
+  const [serverTotal, setServerTotal] = React.useState(0);
+  const [isServerLoading, setIsServerLoading] = React.useState(isServerMode);
+  const [serverError, setServerError] = React.useState<string | null>(null);
+
+  // ─── Table state ───────────────────────────────────────────────────────────
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    []
+  );
+  const [globalFilter, setGlobalFilter] = React.useState("");
+  const [columnVisibility, setColumnVisibility] =
+    React.useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+  const [expanded, setExpanded] = React.useState<ExpandedState>({});
+  const [visibilityOpen, setVisibilityOpen] = React.useState(false);
+  const [pagination, setPagination] = React.useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: defaultPageSize,
+  });
+
+  // Column pinning — initialised from `pin` field in column defs
+  const [columnPinning] = React.useState<ColumnPinningState>(() => {
+    const left: string[] = [];
+    const right: string[] = [];
+    for (const col of columnDefs) {
+      const id =
+        (col as { accessorKey?: string }).accessorKey ?? col.id ?? "";
+      if (id && col.pin === "left") left.push(id);
+      if (id && col.pin === "right") right.push(id);
+    }
+    return { left, right };
+  });
+
+  // ─── Server-side fetch ─────────────────────────────────────────────────────
+  React.useEffect(() => {
+    if (!fetchData) return;
+
+    let cancelled = false;
+    setIsServerLoading(true);
+    setServerError(null);
+
+    fetchData({
+      page: pagination.pageIndex,
+      pageSize: pagination.pageSize,
+      sorting: sorting.map((s) => ({ id: s.id, desc: s.desc })),
+      filters: columnFilters.map((f) => ({ id: f.id, value: f.value })),
+      globalFilter,
+    })
+      .then(({ data: newData, total }) => {
+        if (!cancelled) {
+          setServerData(newData);
+          setServerTotal(total);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setServerError(
+            err instanceof Error ? err.message : "Failed to load data"
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsServerLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchData, pagination.pageIndex, pagination.pageSize, sorting, columnFilters, globalFilter]);
+
+  // ─── Build columns ─────────────────────────────────────────────────────────
   const columns = React.useMemo<ColumnDef<TData>[]>(() => {
     const cols: ColumnDef<TData>[] = [];
 
+    // Expand toggle column
+    if (enableRowExpansion && renderSubRow) {
+      cols.push({
+        id: "__expand__",
+        header: () => null,
+        cell: ({ row }) =>
+          row.getCanExpand() ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                row.toggleExpanded();
+              }}
+              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+              aria-label={row.getIsExpanded() ? "Collapse row" : "Expand row"}
+            >
+              <span
+                aria-hidden
+                className={cn(
+                  "inline-block transition-transform",
+                  row.getIsExpanded() && "rotate-90"
+                )}
+              >
+                ▶
+              </span>
+            </button>
+          ) : null,
+        enableSorting: false,
+        enableHiding: false,
+        size: 36,
+      });
+    }
+
+    // Selection column
     if (enableRowSelection) {
       cols.push({
         id: "__select__",
@@ -370,8 +618,19 @@ export function DataTable<TData>({
       });
     }
 
-    cols.push(...(columnDefs as ColumnDef<TData>[]));
+    // Apply formatters to column defs that lack a custom cell renderer
+    const processedDefs = columnDefs.map((col): ColumnDef<TData> => {
+      if (!col.formatter || col.cell) return col as ColumnDef<TData>;
+      const formatter = col.formatter;
+      return {
+        ...col,
+        cell: ({ getValue }) => formatCellValue(getValue(), formatter),
+      } as ColumnDef<TData>;
+    });
 
+    cols.push(...processedDefs);
+
+    // Actions column
     if (rowActions && rowActions.length > 0) {
       cols.push({
         id: "__actions__",
@@ -402,10 +661,15 @@ export function DataTable<TData>({
     }
 
     return cols;
-  }, [columnDefs, enableRowSelection, rowActions]);
+  }, [columnDefs, enableRowExpansion, enableRowSelection, renderSubRow, rowActions]);
+
+  // ─── Table instance ────────────────────────────────────────────────────────
+  const tableData = isServerMode ? serverData : (dataProp ?? []);
+  const effectiveLoading = isLoading || isServerLoading;
+  const effectiveError = error ?? serverError;
 
   const table = useReactTable({
-    data,
+    data: tableData,
     columns,
     filterFns: {
       dateRange: dateRangeFilter as FilterFn<TData>,
@@ -417,7 +681,20 @@ export function DataTable<TData>({
       globalFilter,
       columnVisibility,
       rowSelection,
+      expanded,
+      pagination,
+      columnPinning,
     },
+    // Server-side flags
+    manualSorting: isServerMode,
+    manualFiltering: isServerMode,
+    manualPagination: isServerMode,
+    pageCount: isServerMode
+      ? Math.ceil(serverTotal / pagination.pageSize)
+      : undefined,
+    // Row expansion
+    getRowCanExpand: () => enableRowExpansion && Boolean(renderSubRow),
+    // State handlers
     enableRowSelection,
     enableMultiRowSelection: enableRowSelection,
     enableSorting,
@@ -426,6 +703,8 @@ export function DataTable<TData>({
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
     onColumnVisibilityChange: setColumnVisibility,
+    onExpandedChange: setExpanded,
+    onPaginationChange: setPagination,
     onRowSelectionChange: (updater) => {
       const next =
         typeof updater === "function" ? updater(rowSelection) : updater;
@@ -433,14 +712,15 @@ export function DataTable<TData>({
       if (onSelectionChange) {
         const selected = Object.keys(next)
           .filter((key) => next[key])
-          .map((key) => data[Number(key)]);
+          .map((key) => tableData[Number(key)]);
         onSelectionChange(selected);
       }
     },
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: isServerMode ? undefined : getFilteredRowModel(),
+    getSortedRowModel: isServerMode ? undefined : getSortedRowModel(),
     getPaginationRowModel: enablePagination ? getPaginationRowModel() : undefined,
+    getExpandedRowModel: getExpandedRowModel(),
     initialState: {
       pagination: { pageSize: defaultPageSize },
     },
@@ -540,7 +820,11 @@ export function DataTable<TData>({
       {table.getFlatHeaders().map((header) => {
         const colDef = header.column.columnDef as DataTableColumnDef<TData>;
         return (
-          <TableHead key={header.id} className="align-top">
+          <TableHead
+            key={header.id}
+            className="align-top"
+            style={getPinnedStyle(header.column)}
+          >
             {header.isPlaceholder ? null : (
               <ColumnFilterInput
                 columnId={header.column.id}
@@ -557,7 +841,7 @@ export function DataTable<TData>({
 
   // ─── Pagination ───────────────────────────────────────────────────────────────
 
-  const pagination = enablePagination && (
+  const paginationUI = enablePagination && (
     <div className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
       <div className="flex items-center gap-2">
         <span className="text-muted-foreground">Rows per page:</span>
@@ -574,10 +858,20 @@ export function DataTable<TData>({
         </select>
       </div>
       <div className="flex items-center gap-1">
-        <span className="text-muted-foreground">
-          Page {table.getState().pagination.pageIndex + 1} of{" "}
-          {table.getPageCount()}
-        </span>
+        {isServerMode ? (
+          <span className="text-muted-foreground">
+            Page {table.getState().pagination.pageIndex + 1} of{" "}
+            {table.getPageCount() > 0 ? table.getPageCount() : "…"}
+            {serverTotal > 0 && (
+              <span> &mdash; {serverTotal} total</span>
+            )}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">
+            Page {table.getState().pagination.pageIndex + 1} of{" "}
+            {table.getPageCount()}
+          </span>
+        )}
         <Button
           variant="outline"
           size="sm"
@@ -619,7 +913,7 @@ export function DataTable<TData>({
   return (
     <div className={cn("space-y-2", className)}>
       {toolbar}
-      <div className="rounded-md border">
+      <div className="overflow-x-auto rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -628,7 +922,16 @@ export function DataTable<TData>({
                   <TableHead
                     key={header.id}
                     colSpan={header.colSpan}
-                    style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
+                    style={{
+                      width:
+                        header.getSize() !== 150
+                          ? header.getSize()
+                          : undefined,
+                      ...getPinnedStyle(header.column),
+                    }}
+                    className={cn(
+                      header.column.getIsPinned() && "shadow-[inset_-1px_0_0_0_hsl(var(--border))]"
+                    )}
                   >
                     {header.isPlaceholder ? null : (
                       <div
@@ -655,7 +958,10 @@ export function DataTable<TData>({
                         )}
                         {header.column.getIsSorted() === false &&
                           header.column.getCanSort() && (
-                            <span aria-hidden className="text-muted-foreground/40">
+                            <span
+                              aria-hidden
+                              className="text-muted-foreground/40"
+                            >
                               ↕
                             </span>
                           )}
@@ -668,17 +974,17 @@ export function DataTable<TData>({
             {columnFilterRow}
           </TableHeader>
           <TableBody>
-            {isLoading ? (
+            {effectiveLoading ? (
               Array.from({ length: defaultPageSize }).map((_, i) => (
                 <SkeletonRow key={i} columnCount={columns.length} />
               ))
-            ) : error ? (
+            ) : effectiveError ? (
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
                   className="h-24 text-center text-destructive"
                 >
-                  {error}
+                  {effectiveError}
                 </TableCell>
               </TableRow>
             ) : table.getRowModel().rows.length === 0 ? (
@@ -691,28 +997,56 @@ export function DataTable<TData>({
                 </TableCell>
               </TableRow>
             ) : (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() ? "selected" : undefined}
-                  onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                  className={cn(onRowClick && "cursor-pointer")}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              table.getRowModel().rows.flatMap((row) => {
+                const visibleCells = row.getVisibleCells();
+                return [
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() ? "selected" : undefined}
+                    onClick={
+                      onRowClick ? () => onRowClick(row.original) : undefined
+                    }
+                    className={cn(onRowClick && "cursor-pointer")}
+                  >
+                    {visibleCells.map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        style={getPinnedStyle(cell.column)}
+                        className={cn(
+                          cell.column.getIsPinned() &&
+                            "shadow-[inset_-1px_0_0_0_hsl(var(--border))]"
+                        )}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>,
+                  // Expanded sub-row
+                  ...(row.getIsExpanded() && renderSubRow
+                    ? [
+                        <TableRow
+                          key={`${row.id}__expanded`}
+                          className="bg-muted/30 hover:bg-muted/30"
+                        >
+                          <TableCell
+                            colSpan={visibleCells.length}
+                            className="px-4 py-3"
+                          >
+                            {renderSubRow(row.original)}
+                          </TableCell>
+                        </TableRow>,
+                      ]
+                    : []),
+                ];
+              })
             )}
           </TableBody>
         </Table>
       </div>
-      {pagination}
+      {paginationUI}
     </div>
   );
 }
