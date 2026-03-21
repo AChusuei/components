@@ -1,31 +1,7 @@
 import * as React from "react";
-import { cva, type VariantProps } from "class-variance-authority";
+import { type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
-
-const spinnerVariants = cva(
-  "animate-spin rounded-full border-2 border-current border-t-transparent",
-  {
-    variants: {
-      size: {
-        sm: "h-4 w-4",
-        md: "h-8 w-8",
-        lg: "h-12 w-12",
-      },
-      color: {
-        inherit: "text-current",
-        primary: "text-primary",
-        secondary: "text-secondary-foreground",
-        destructive: "text-destructive",
-        muted: "text-muted-foreground",
-        white: "text-white",
-      },
-    },
-    defaultVariants: {
-      size: "md",
-      color: "inherit",
-    },
-  }
-);
+import { spinnerVariants } from "./spinner-variants";
 
 export interface SpinnerProps
   extends Omit<React.HTMLAttributes<HTMLDivElement>, "color">,
@@ -72,5 +48,4 @@ const Loader = React.forwardRef<HTMLDivElement, LoaderProps>(
 );
 Loader.displayName = "Loader";
 
-// eslint-disable-next-line react-refresh/only-export-components
-export { Spinner, Loader, spinnerVariants };
+export { Spinner, Loader };
