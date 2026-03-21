@@ -1,0 +1,25 @@
+{
+  "type": "rig-settings",
+  "version": 1,
+  "merge_queue": {
+    "enabled": true,
+    "integration_branch_polecat_enabled": true,
+    "integration_branch_refinery_enabled": true,
+    "on_conflict": "assign_back",
+    "run_tests": true,
+    "setup_command": "npm install",
+    "build_command": "npm run build",
+    "typecheck_command": "npm run typecheck",
+    "lint_command": "npm run lint",
+    "test_command": "npm test",
+    "delete_merged_branches": true,
+    "retry_flaky_tests": 1,
+    "poll_interval": "30s",
+    "max_concurrent": 1,
+    "stale_claim_timeout": "30m"
+  },
+  "namepool": {
+    "style": "mad-max",
+    "max_before_numbering": 50
+  }
+}
