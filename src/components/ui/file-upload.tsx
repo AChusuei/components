@@ -321,9 +321,14 @@ export function FileUpload({
         ) : (
           <>
             <p className="text-sm font-medium">
-              Drag &amp; drop files here, or{" "}
-              <span className="text-primary underline-offset-2 hover:underline">
-                click to browse
+              <span className="hidden sm:inline">
+                Drag &amp; drop files here, or{" "}
+                <span className="text-primary underline-offset-2 hover:underline">
+                  click to browse
+                </span>
+              </span>
+              <span className="sm:hidden text-primary underline-offset-2">
+                Tap to add photos
               </span>
             </p>
             {maxSize && (
