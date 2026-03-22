@@ -176,10 +176,15 @@ export function FileUpload({
 
   const files = isControlled ? value : internalFiles;
 
+  // Keep a ref so async upload callbacks always read the latest controlled value
+  // without capturing a stale closure.
+  const valueRef = React.useRef(value);
+  valueRef.current = value;
+
   const updateFiles = React.useCallback(
     (updater: (prev: UploadFile[]) => UploadFile[]) => {
       if (isControlled) {
-        const next = updater(value!);
+        const next = updater(valueRef.current!);
         onChange?.(next);
       } else {
         setInternalFiles((prev) => {
@@ -189,7 +194,7 @@ export function FileUpload({
         });
       }
     },
-    [isControlled, value, onChange]
+    [isControlled, onChange]
   );
 
   const addFiles = React.useCallback(
