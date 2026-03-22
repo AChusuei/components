@@ -68,7 +68,10 @@ function formatBytes(bytes: number): string {
 }
 
 function isImageFile(file: File): boolean {
-  return file.type.startsWith("image/");
+  if (file.type.startsWith("image/")) return true
+  // Fallback: check extension — browsers sometimes report empty type for HEIC/HEIF
+  const ext = file.name.split(".").pop()?.toLowerCase()
+  return ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "avif"].includes(ext ?? "")
 }
 
 function FileTypeIcon({ file, className }: { file: File; className?: string }) {
