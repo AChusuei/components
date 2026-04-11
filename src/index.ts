@@ -11,3 +11,7 @@ export * from "@/components/ui/data-table";
 export * from "@/components/ui/theme-provider";
 export * from "@/components/ui/progress";
 export * from "@/components/ui/file-upload";
+export * from "@/components/ui/popover";
+export * from "@/components/ui/calendar";
+export * from "@/components/ui/date-range-presets";
+export * from "@/components/ui/date-picker";

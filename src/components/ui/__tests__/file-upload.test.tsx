@@ -1,4 +1,4 @@
-import { render, screen, act, waitFor } from "@testing-library/react"
+import { render, act, waitFor } from "@testing-library/react"
 import { vi, describe, it, expect } from "vitest"
 import * as React from "react"
 import { FileUpload } from "../file-upload"
@@ -113,11 +113,9 @@ describe("FileUpload — controlled mode stale closure fix", () => {
     )
 
     const onChangeCalls: UploadFile[][] = []
-    let controlledValue: UploadFile[] = []
 
     function TestHarness() {
       const [files, setFiles] = React.useState<UploadFile[]>([])
-      controlledValue = files
 
       return (
         <FileUpload
