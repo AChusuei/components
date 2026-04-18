@@ -22,7 +22,24 @@ export default defineConfig({
       fileName: (format) => `index.${format === "es" ? "js" : "cjs"}`,
     },
     rollupOptions: {
-      external: ["react", "react-dom", "react/jsx-runtime"],
+      external: [
+        "react",
+        "react-dom",
+        "react/jsx-runtime",
+        "@radix-ui/react-popover",
+        "@radix-ui/react-progress",
+        "@radix-ui/react-select",
+        "@radix-ui/react-slot",
+        "@tanstack/react-table",
+        "class-variance-authority",
+        "clsx",
+        "date-fns",
+        "lucide-react",
+        "react-day-picker",
+        "react-dropzone",
+        "react-hook-form",
+        "tailwind-merge",
+      ],
       output: {
         globals: {
           react: "React",

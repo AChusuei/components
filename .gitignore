@@ -11,7 +11,7 @@ CLAUDE.md
 
 # Node
 node_modules/
-dist/
+# dist/ is intentionally committed so the package can be used as a GitHub dependency
 .cache/
 
 # Env
