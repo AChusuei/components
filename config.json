@@ -1,0 +1,10 @@
+{
+  "type": "rig",
+  "version": 1,
+  "name": "components",
+  "git_url": "git@github.com:AChusuei/components.git",
+  "created_at": "2026-03-12T09:34:12.585928-04:00",
+  "beads": {
+    "prefix": "co"
+  }
+}
