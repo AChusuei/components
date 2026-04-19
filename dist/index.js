@@ -134,7 +134,7 @@ const M = d.forwardRef(({ className: e, ...n }, r) => /* @__PURE__ */ t(
   {
     ref: r,
     className: m(
-      "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
+      "border-b transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 data-[state=selected]:bg-muted",
       e
     ),
     ...n
@@ -146,7 +146,7 @@ const re = d.forwardRef(({ className: e, ...n }, r) => /* @__PURE__ */ t(
   {
     ref: r,
     className: m(
-      "h-10 px-3 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+      "h-10 px-3 text-left align-middle font-medium text-muted-foreground uppercase text-xs tracking-wide [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
       e
     ),
     ...n
