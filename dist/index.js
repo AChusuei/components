@@ -541,7 +541,7 @@ function Wt({
     initialState: {
       pagination: { pageSize: U }
     }
-  }), Q = v.getSelectedRowModel().rows.map((a) => a.original), Ye = /* @__PURE__ */ d("div", { className: "flex flex-wrap items-center justify-between gap-2 py-2", children: [
+  }), Q = v.getSelectedRowModel().rows.map((a) => a.original), Ye = /* @__PURE__ */ d("div", { className: "flex flex-wrap items-center justify-between gap-2 px-3 py-2", children: [
     /* @__PURE__ */ d("div", { className: "flex flex-1 flex-wrap items-center gap-2", children: [
       F && /* @__PURE__ */ d("div", { className: "relative flex-1", children: [
         /* @__PURE__ */ t(rt, { className: "absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" }),
@@ -619,7 +619,7 @@ function Wt({
         C,
         {
           variant: "outline",
-          size: "icon",
+          size: "sm",
           "aria-label": "Export CSV",
           title: "Export CSV",
           onClick: () => _t(
@@ -635,7 +635,7 @@ function Wt({
           C,
           {
             variant: "outline",
-            size: "icon",
+            size: "sm",
             "aria-label": "Columns",
             title: "Columns",
             onClick: () => Ee((a) => !a),

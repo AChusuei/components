@@ -736,7 +736,7 @@ export function DataTable<TData>({
   // ─── Toolbar ────────────────────────────────────────────────────────────────
 
   const toolbar = (
-    <div className="flex flex-wrap items-center justify-between gap-2 py-2">
+    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
       <div className="flex flex-1 flex-wrap items-center gap-2">
         {enableGlobalFilter && (
           <div className="relative flex-1">
@@ -811,7 +811,7 @@ export function DataTable<TData>({
         {enableExport && (
           <Button
             variant="outline"
-            size="icon"
+            size="sm"
             aria-label="Export CSV"
             title="Export CSV"
             onClick={() =>
@@ -829,7 +829,7 @@ export function DataTable<TData>({
           <div className="relative">
             <Button
               variant="outline"
-              size="icon"
+              size="sm"
               aria-label="Columns"
               title="Columns"
               onClick={() => setVisibilityOpen((v) => !v)}
