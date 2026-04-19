@@ -710,7 +710,7 @@ function Wt({
       ] }),
       T
     ] })
-  ] }), Ae = j && /* @__PURE__ */ d("div", { className: "flex flex-wrap items-center justify-between gap-2 py-2 text-sm", children: [
+  ] }), Ae = j && /* @__PURE__ */ d("div", { className: "flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-sm", children: [
     /* @__PURE__ */ d("div", { className: "flex items-center gap-2", children: [
       /* @__PURE__ */ t("span", { className: "text-muted-foreground", children: "Rows per page:" }),
       /* @__PURE__ */ t(
