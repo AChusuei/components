@@ -29,7 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Search, Download, Columns2 } from "lucide-react";
+import { Search, Download, Columns2, SlidersHorizontal, X } from "lucide-react";
 
 // ─── Filter Types ────────────────────────────────────────────────────────────
 
@@ -490,6 +490,7 @@ export function DataTable<TData>({
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   const [expanded, setExpanded] = React.useState<ExpandedState>({});
   const [visibilityOpen, setVisibilityOpen] = React.useState(false);
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [pagination, setPagination] = React.useState<PaginationState>({
     pageIndex: 0,
     pageSize: defaultPageSize,
@@ -748,6 +749,43 @@ export function DataTable<TData>({
             />
           </div>
         )}
+        {enableColumnFilters && (
+          <Button
+            variant={filtersOpen ? "secondary" : "outline"}
+            size="icon"
+            aria-label="Toggle filters"
+            title="Toggle filters"
+            onClick={() => setFiltersOpen((v) => !v)}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+          </Button>
+        )}
+        {enableColumnFilters &&
+          columnFilters.map((f) => {
+            const colDef = columnDefs.find(
+              (c) => ((c as { accessorKey?: string }).accessorKey ?? c.id) === f.id
+            );
+            const label =
+              typeof colDef?.header === "string" ? colDef.header : f.id;
+            return (
+              <span
+                key={f.id}
+                className="inline-flex items-center gap-1 rounded-full border border-input bg-accent px-2 py-0.5 text-xs"
+              >
+                {label}
+                <button
+                  onClick={() => {
+                    const col = table.getColumn(f.id);
+                    col?.setFilterValue(undefined);
+                  }}
+                  className="ml-0.5 rounded-full hover:text-destructive"
+                  aria-label={`Clear filter: ${label}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            );
+          })}
         {enableRowSelection &&
           selectedRows.length > 0 &&
           bulkActions &&
@@ -980,7 +1018,7 @@ export function DataTable<TData>({
                 ))}
               </TableRow>
             ))}
-            {columnFilterRow}
+            {filtersOpen && columnFilterRow}
           </TableHeader>
           <TableBody>
             {effectiveLoading ? (

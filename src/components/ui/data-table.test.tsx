@@ -123,7 +123,21 @@ describe("DataTable", () => {
 
   // ── Per-column Filters ────────────────────────────────────────────────────
 
-  it("renders column filter inputs when enableColumnFilters is true", () => {
+  it("filter row is hidden by default when enableColumnFilters is true", () => {
+    const cols: DataTableColumnDef<Person>[] = [
+      { accessorKey: "name", header: "Name", filterMeta: { filterVariant: "text" } },
+    ];
+    render(<DataTable columns={cols} data={PEOPLE} enableColumnFilters />);
+    expect(screen.queryByPlaceholderText("Filter…")).not.toBeInTheDocument();
+  });
+
+  it("shows Filters toggle button when enableColumnFilters is true", () => {
+    render(<DataTable columns={COLUMNS} data={PEOPLE} enableColumnFilters />);
+    expect(screen.getByRole("button", { name: /toggle filters/i })).toBeInTheDocument();
+  });
+
+  it("clicking Toggle filters button shows the filter row", async () => {
+    const user = userEvent.setup();
     const cols: DataTableColumnDef<Person>[] = [
       { accessorKey: "name", header: "Name", filterMeta: { filterVariant: "text" } },
       {
@@ -139,8 +153,36 @@ describe("DataTable", () => {
       },
     ];
     render(<DataTable columns={cols} data={PEOPLE} enableColumnFilters />);
+    await user.click(screen.getByRole("button", { name: /toggle filters/i }));
     expect(screen.getAllByPlaceholderText("Filter…").length).toBeGreaterThan(0);
     expect(screen.getAllByRole("combobox").length).toBeGreaterThan(0);
+  });
+
+  it("shows active filter chip when a column filter is set", async () => {
+    const user = userEvent.setup();
+    const cols: DataTableColumnDef<Person>[] = [
+      { accessorKey: "name", header: "Name", filterMeta: { filterVariant: "text" } },
+    ];
+    render(<DataTable columns={cols} data={PEOPLE} enableColumnFilters enablePagination={false} />);
+    await user.click(screen.getByRole("button", { name: /toggle filters/i }));
+    const filterInput = screen.getByPlaceholderText("Filter…");
+    await user.type(filterInput, "Alice");
+    expect(screen.getByRole("button", { name: /clear filter: name/i })).toBeInTheDocument();
+  });
+
+  it("clicking chip X button clears the filter", async () => {
+    const user = userEvent.setup();
+    const cols: DataTableColumnDef<Person>[] = [
+      { accessorKey: "name", header: "Name", filterMeta: { filterVariant: "text" } },
+    ];
+    render(<DataTable columns={cols} data={PEOPLE} enableColumnFilters enablePagination={false} />);
+    await user.click(screen.getByRole("button", { name: /toggle filters/i }));
+    const filterInput = screen.getByPlaceholderText("Filter…");
+    await user.type(filterInput, "Alice");
+    expect(screen.queryByText("Bob")).not.toBeInTheDocument();
+    const clearBtn = screen.getByRole("button", { name: /clear filter: name/i });
+    await user.click(clearBtn);
+    expect(screen.getByText("Bob")).toBeInTheDocument();
   });
 
   // ── Pagination ────────────────────────────────────────────────────────────
@@ -301,20 +343,24 @@ describe("DataTable", () => {
 
   // ── Number range filter ───────────────────────────────────────────────────
 
-  it("renders numberRange filter inputs", () => {
+  it("renders numberRange filter inputs after toggle", async () => {
+    const user = userEvent.setup();
     const cols: DataTableColumnDef<Person>[] = [
       { accessorKey: "score", header: "Score", filterMeta: { filterVariant: "numberRange" } },
     ];
     render(<DataTable columns={cols} data={PEOPLE} enableColumnFilters />);
+    await user.click(screen.getByRole("button", { name: /toggle filters/i }));
     expect(screen.getByPlaceholderText("Min")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Max")).toBeInTheDocument();
   });
 
-  it("renders dateRange filter inputs", () => {
+  it("renders dateRange filter inputs after toggle", async () => {
+    const user = userEvent.setup();
     const cols: DataTableColumnDef<Person>[] = [
       { accessorKey: "joinDate", header: "Join Date", filterMeta: { filterVariant: "dateRange" } },
     ];
     render(<DataTable columns={cols} data={PEOPLE} enableColumnFilters />);
+    await user.click(screen.getByRole("button", { name: /toggle filters/i }));
     expect(screen.getByPlaceholderText("From")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("To")).toBeInTheDocument();
   });
@@ -326,6 +372,7 @@ describe("DataTable", () => {
       { accessorKey: "score", header: "Score", filterMeta: { filterVariant: "numberRange" } },
     ];
     render(<DataTable columns={cols} data={PEOPLE} enableColumnFilters enablePagination={false} />);
+    await user.click(screen.getByRole("button", { name: /toggle filters/i }));
     const minInput = screen.getByPlaceholderText("Min");
     await user.type(minInput, "75");
     expect(screen.getByText("Alice")).toBeInTheDocument();

@@ -156,6 +156,36 @@ export const WithSortingAndFiltersDark: Story = {
   },
 };
 
+export const FilterCollapse: Story = {
+  name: "Filter Row Collapse + Active Chips",
+  args: {
+    columns: COLUMNS,
+    data: PEOPLE,
+    enableSorting: true,
+    enableColumnFilters: true,
+    enableGlobalFilter: true,
+  },
+};
+
+export const FilterCollapseDark: Story = {
+  name: "Filter Row Collapse + Active Chips (Dark)",
+  parameters: { backgrounds: { default: "dark" } },
+  decorators: [
+    (Story) => (
+      <div className="dark">
+        <Story />
+      </div>
+    ),
+  ],
+  args: {
+    columns: COLUMNS,
+    data: PEOPLE,
+    enableSorting: true,
+    enableColumnFilters: true,
+    enableGlobalFilter: true,
+  },
+};
+
 export const WithRowSelection: Story = {
   name: "Row Selection + Bulk Actions",
   args: {
