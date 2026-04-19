@@ -282,7 +282,7 @@ function ColumnFilterInput({
         onChange={(e) =>
           onChange(e.target.value === "" ? undefined : e.target.value)
         }
-        className="mt-1 h-7 w-full rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+        className="h-8 w-full rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
       >
         <option value="">All</option>
         {filterMeta.options.map((opt) => (
@@ -297,19 +297,19 @@ function ColumnFilterInput({
   if (filterMeta.filterVariant === "dateRange") {
     const range = (value as [string?, string?]) ?? [undefined, undefined];
     return (
-      <div className="mt-1 flex flex-col gap-1">
+      <div className="flex flex-col gap-1">
         <input
           type="date"
           value={range[0] ?? ""}
           onChange={(e) => onChange([e.target.value || undefined, range[1]])}
-          className="h-7 w-full rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-8 w-full rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
           placeholder="From"
         />
         <input
           type="date"
           value={range[1] ?? ""}
           onChange={(e) => onChange([range[0], e.target.value || undefined])}
-          className="h-7 w-full rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-8 w-full rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
           placeholder="To"
         />
       </div>
@@ -319,7 +319,7 @@ function ColumnFilterInput({
   if (filterMeta.filterVariant === "numberRange") {
     const range = (value as [number?, number?]) ?? [undefined, undefined];
     return (
-      <div className="mt-1 flex flex-col gap-1">
+      <div className="flex flex-col gap-1">
         <input
           type="number"
           value={range[0] ?? ""}
@@ -329,7 +329,7 @@ function ColumnFilterInput({
               range[1],
             ])
           }
-          className="h-7 w-full rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-8 w-full rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
           placeholder="Min"
         />
         <input
@@ -341,7 +341,7 @@ function ColumnFilterInput({
               e.target.value !== "" ? Number(e.target.value) : undefined,
             ])
           }
-          className="h-7 w-full rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-8 w-full rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
           placeholder="Max"
         />
       </div>
@@ -354,7 +354,7 @@ function ColumnFilterInput({
       type="text"
       value={(value as string) ?? ""}
       onChange={(e) => onChange(e.target.value || undefined)}
-      className="mt-1 h-7 w-full rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+      className="h-8 w-full rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
       placeholder="Filter…"
     />
   );
@@ -491,6 +491,19 @@ export function DataTable<TData>({
   const [expanded, setExpanded] = React.useState<ExpandedState>({});
   const [visibilityOpen, setVisibilityOpen] = React.useState(false);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
+  const filterPanelRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!filtersOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        setFiltersOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [filtersOpen]);
+
   const [pagination, setPagination] = React.useState<PaginationState>({
     pageIndex: 0,
     pageSize: defaultPageSize,
@@ -739,7 +752,7 @@ export function DataTable<TData>({
     <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
       <div className="flex flex-1 flex-wrap items-center gap-2">
         {enableGlobalFilter && (
-          <div className="relative flex-1">
+          <div className="relative min-w-[180px] max-w-[320px]">
             <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <input
               value={globalFilter}
@@ -750,21 +763,66 @@ export function DataTable<TData>({
           </div>
         )}
         {enableColumnFilters && (
-          <Button
-            variant={filtersOpen ? "secondary" : "outline"}
-            size="sm"
-            aria-label="Toggle filters"
-            title="Toggle filters"
-            onClick={() => setFiltersOpen((v) => !v)}
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Filters
-            {columnFilters.length > 0 && (
-              <span className="ml-1 rounded-full bg-primary px-1.5 py-0.5 text-xs leading-none text-primary-foreground">
-                {columnFilters.length}
-              </span>
+          <div className="relative" ref={filterPanelRef}>
+            <Button
+              variant={filtersOpen ? "secondary" : "outline"}
+              size="sm"
+              aria-label="Toggle filters"
+              title="Toggle filters"
+              onClick={() => setFiltersOpen((v) => !v)}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filters
+              {columnFilters.length > 0 && (
+                <span className="ml-1 rounded-full bg-primary px-1.5 py-0.5 text-xs leading-none text-primary-foreground">
+                  {columnFilters.length}
+                </span>
+              )}
+            </Button>
+
+            {filtersOpen && (
+              <div className="absolute left-0 top-[calc(100%+4px)] z-50 w-[520px] rounded-lg border bg-popover p-4 shadow-lg">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">Filters</span>
+                    {columnFilters.length > 0 && (
+                      <span className="rounded-full bg-primary px-2 py-0.5 text-xs leading-none text-primary-foreground">
+                        {columnFilters.length} active
+                      </span>
+                    )}
+                  </div>
+                  {columnFilters.length > 0 && (
+                    <button
+                      onClick={() => setColumnFilters([])}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  {table.getFlatHeaders().map((header) => {
+                    const colDef = header.column.columnDef as DataTableColumnDef<TData>;
+                    if (!colDef.filterMeta) return null;
+                    const label = typeof colDef.header === "string" ? colDef.header : header.column.id;
+                    return (
+                      <div key={header.id}>
+                        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {label}
+                        </label>
+                        <ColumnFilterInput
+                          columnId={header.column.id}
+                          filterMeta={colDef.filterMeta}
+                          value={header.column.getFilterValue()}
+                          onChange={(val) => header.column.setFilterValue(val)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             )}
-          </Button>
+          </div>
         )}
         {enableColumnFilters &&
           columnFilters.map((f) => {
@@ -864,32 +922,6 @@ export function DataTable<TData>({
         {refreshSlot}
       </div>
     </div>
-  );
-
-  // ─── Column Filter Row ───────────────────────────────────────────────────────
-
-  const columnFilterRow = enableColumnFilters && (
-    <TableRow>
-      {table.getFlatHeaders().map((header) => {
-        const colDef = header.column.columnDef as DataTableColumnDef<TData>;
-        return (
-          <TableHead
-            key={header.id}
-            className="align-top"
-            style={getPinnedStyle(header.column)}
-          >
-            {header.isPlaceholder ? null : (
-              <ColumnFilterInput
-                columnId={header.column.id}
-                filterMeta={colDef.filterMeta}
-                value={header.column.getFilterValue()}
-                onChange={(val) => header.column.setFilterValue(val)}
-              />
-            )}
-          </TableHead>
-        );
-      })}
-    </TableRow>
   );
 
   // ─── Pagination ───────────────────────────────────────────────────────────────
@@ -1032,7 +1064,6 @@ export function DataTable<TData>({
                 ))}
               </TableRow>
             ))}
-            {filtersOpen && columnFilterRow}
           </TableHeader>
           <TableBody>
             {effectiveLoading ? (

@@ -724,9 +724,9 @@ describe("DataTable", () => {
 
   // ── co-fqy: Visual polish ─────────────────────────────────────────────────
 
-  it("search input has flex-1 class (not w-48)", () => {
+  it("search input is constrained to max-w-[320px] (not full-width)", () => {
     const { container } = setup({ enableGlobalFilter: true });
-    const wrapper = container.querySelector(".flex-1.relative");
+    const wrapper = container.querySelector(".relative.min-w-\\[180px\\]");
     expect(wrapper).toBeInTheDocument();
     const input = wrapper?.querySelector("input");
     expect(input?.className).not.toContain("w-48");
