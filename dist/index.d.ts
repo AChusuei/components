@@ -5,6 +5,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { DateRange } from 'react-day-picker';
 import { DayPickerProps } from 'react-day-picker';
 import { JSX as JSX_2 } from 'react/jsx-runtime';
+import * as PopoverPrimitive from '@radix-ui/react-popover';
 import * as ProgressPrimitive from '@radix-ui/react-progress';
 import * as React_2 from 'react';
 import { VariantProps } from 'class-variance-authority';
@@ -267,13 +268,13 @@ export declare interface NumberRangeFilterMeta {
     filterVariant: "numberRange";
 }
 
-export declare const Popover: any;
+export declare const Popover: React_2.FC<PopoverPrimitive.PopoverProps>;
 
-export declare const PopoverAnchor: any;
+export declare const PopoverAnchor: React_2.ForwardRefExoticComponent<PopoverPrimitive.PopoverAnchorProps & React_2.RefAttributes<HTMLDivElement>>;
 
-export declare const PopoverContent: React_2.ForwardRefExoticComponent<any>;
+export declare const PopoverContent: React_2.ForwardRefExoticComponent<Omit<PopoverPrimitive.PopoverContentProps & React_2.RefAttributes<HTMLDivElement>, "ref"> & React_2.RefAttributes<HTMLDivElement>>;
 
-export declare const PopoverTrigger: any;
+export declare const PopoverTrigger: React_2.ForwardRefExoticComponent<PopoverPrimitive.PopoverTriggerProps & React_2.RefAttributes<HTMLButtonElement>>;
 
 export declare const Progress: React_2.ForwardRefExoticComponent<Omit<ProgressPrimitive.ProgressProps & React_2.RefAttributes<HTMLDivElement>, "ref"> & React_2.RefAttributes<HTMLDivElement>>;
 

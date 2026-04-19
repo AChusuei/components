@@ -269,13 +269,13 @@ describe("DataTable", () => {
 
   it("shows Columns button when enableColumnVisibility is true", () => {
     setup({ enableColumnVisibility: true });
-    expect(screen.getByText("Columns")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /columns/i })).toBeInTheDocument();
   });
 
   it("toggles column visibility dropdown", async () => {
     const user = userEvent.setup();
     setup({ enableColumnVisibility: true });
-    await user.click(screen.getByText("Columns"));
+    await user.click(screen.getByRole("button", { name: /columns/i }));
     const visibilityCheckboxes = screen.getAllByRole("checkbox");
     expect(visibilityCheckboxes.length).toBeGreaterThan(0);
   });
@@ -284,7 +284,7 @@ describe("DataTable", () => {
 
   it("shows Export CSV button when enableExport is true", () => {
     setup({ enableExport: true });
-    expect(screen.getByText("Export CSV")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /export csv/i })).toBeInTheDocument();
   });
 
   // ── Custom Slots ──────────────────────────────────────────────────────────

@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Search, Download, Columns2 } from "lucide-react";
 
 // ─── Filter Types ────────────────────────────────────────────────────────────
 
@@ -737,12 +738,15 @@ export function DataTable<TData>({
     <div className="flex flex-wrap items-center justify-between gap-2 py-2">
       <div className="flex flex-1 flex-wrap items-center gap-2">
         {enableGlobalFilter && (
-          <input
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            placeholder="Search…"
-            className="h-9 w-48 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          />
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <input
+              value={globalFilter}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              placeholder="Search…"
+              className="h-9 w-48 rounded-md border border-input bg-background pl-8 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
         )}
         {enableRowSelection &&
           selectedRows.length > 0 &&
@@ -763,7 +767,9 @@ export function DataTable<TData>({
         {enableExport && (
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
+            aria-label="Export CSV"
+            title="Export CSV"
             onClick={() =>
               exportToCsv(
                 table.getFilteredRowModel().rows,
@@ -772,17 +778,19 @@ export function DataTable<TData>({
               )
             }
           >
-            Export CSV
+            <Download className="h-4 w-4" />
           </Button>
         )}
         {enableColumnVisibility && (
           <div className="relative">
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
+              aria-label="Columns"
+              title="Columns"
               onClick={() => setVisibilityOpen((v) => !v)}
             >
-              Columns
+              <Columns2 className="h-4 w-4" />
             </Button>
             {visibilityOpen && (
               <div className="absolute right-0 top-10 z-50 min-w-[160px] rounded-md border bg-background p-2 shadow-md">
