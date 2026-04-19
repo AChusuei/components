@@ -718,7 +718,44 @@ describe("DataTable", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/50 total/)).toBeInTheDocument();
+      expect(screen.getByText("1–2 of 50")).toBeInTheDocument();
     });
+  });
+
+  // ── co-fqy: Visual polish ─────────────────────────────────────────────────
+
+  it("search input has flex-1 class (not w-48)", () => {
+    const { container } = setup({ enableGlobalFilter: true });
+    const wrapper = container.querySelector(".flex-1.relative");
+    expect(wrapper).toBeInTheDocument();
+    const input = wrapper?.querySelector("input");
+    expect(input?.className).not.toContain("w-48");
+    expect(input?.className).toContain("w-full");
+  });
+
+  it("Filters button shows 'Filters' text initially", () => {
+    render(<DataTable columns={COLUMNS} data={PEOPLE} enableColumnFilters />);
+    const btn = screen.getByRole("button", { name: /toggle filters/i });
+    expect(btn).toHaveTextContent("Filters");
+  });
+
+  it("Filters button shows count when column filters are active", async () => {
+    const user = userEvent.setup();
+    const cols: DataTableColumnDef<Person>[] = [
+      { accessorKey: "name", header: "Name", filterMeta: { filterVariant: "text" } },
+      { accessorKey: "role", header: "Role", filterMeta: { filterVariant: "text" } },
+    ];
+    render(<DataTable columns={cols} data={PEOPLE} enableColumnFilters enablePagination={false} />);
+    await user.click(screen.getByRole("button", { name: /toggle filters/i }));
+    const filterInputs = screen.getAllByPlaceholderText("Filter…");
+    await user.type(filterInputs[0], "Alice");
+    await user.type(filterInputs[1], "admin");
+    const btn = screen.getByRole("button", { name: /toggle filters/i });
+    expect(btn).toHaveTextContent(/Filters.*2/);
+  });
+
+  it("pagination label shows X–Y of Z format", () => {
+    setup({ enablePagination: true, defaultPageSize: 2 });
+    expect(screen.getByText("1–2 of 3")).toBeInTheDocument();
   });
 });

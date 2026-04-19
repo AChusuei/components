@@ -739,25 +739,31 @@ export function DataTable<TData>({
     <div className="flex flex-wrap items-center justify-between gap-2 py-2">
       <div className="flex flex-1 flex-wrap items-center gap-2">
         {enableGlobalFilter && (
-          <div className="relative">
+          <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <input
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
               placeholder="Search…"
-              className="h-9 w-48 rounded-md border border-input bg-background pl-8 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              className="h-9 w-full rounded-md border border-input bg-background pl-8 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
         )}
         {enableColumnFilters && (
           <Button
             variant={filtersOpen ? "secondary" : "outline"}
-            size="icon"
+            size="sm"
             aria-label="Toggle filters"
             title="Toggle filters"
             onClick={() => setFiltersOpen((v) => !v)}
           >
             <SlidersHorizontal className="h-4 w-4" />
+            Filters
+            {columnFilters.length > 0 && (
+              <span className="ml-1 rounded-full bg-primary px-1.5 py-0.5 text-xs leading-none text-primary-foreground">
+                {columnFilters.length}
+              </span>
+            )}
           </Button>
         )}
         {enableColumnFilters &&
@@ -907,16 +913,24 @@ export function DataTable<TData>({
       <div className="flex items-center gap-1">
         {isServerMode ? (
           <span className="text-muted-foreground">
-            Page {table.getState().pagination.pageIndex + 1} of{" "}
-            {table.getPageCount() > 0 ? table.getPageCount() : "…"}
-            {serverTotal > 0 && (
-              <span> &mdash; {serverTotal} total</span>
-            )}
+            {serverTotal > 0
+              ? (() => {
+                  const { pageIndex, pageSize } = table.getState().pagination;
+                  const start = pageIndex * pageSize + 1;
+                  const end = Math.min(start + pageSize - 1, serverTotal);
+                  return `${start}–${end} of ${serverTotal}`;
+                })()
+              : "…"}
           </span>
         ) : (
           <span className="text-muted-foreground">
-            Page {table.getState().pagination.pageIndex + 1} of{" "}
-            {table.getPageCount()}
+            {(() => {
+              const { pageIndex, pageSize } = table.getState().pagination;
+              const total = table.getFilteredRowModel().rows.length;
+              const start = pageIndex * pageSize + 1;
+              const end = Math.min(start + pageSize - 1, total);
+              return total > 0 ? `${start}–${end} of ${total}` : "0 of 0";
+            })()}
           </span>
         )}
         <Button
